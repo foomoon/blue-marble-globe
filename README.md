@@ -2,7 +2,8 @@
 
 A clean CesiumJS globe on self-hosted NASA Blue Marble tiles. It needs no API keys, no online map services and no licence, and every tile can be traced back to the exact NASA files it came from.
 
-- **How to add the layer in code:** [docs/adding-a-map-layer.md](docs/adding-a-map-layer.md)
+- **How to build the map data:** [docs/building-the-tiles.md](docs/building-the-tiles.md)
+- **How to add imagery and vector layers in code:** [docs/adding-a-map-layer.md](docs/adding-a-map-layer.md)
 - **Why no licence is needed:** [LICENSING.md](LICENSING.md), backed by archived copies of [NASA's usage guidelines](provenance/terms/nasa-images-and-media-guidelines.md)
 - **Where every tile came from:** [provenance/](provenance/)
 
@@ -13,9 +14,12 @@ Requirements: Node 26 LTS (`nvm use` reads .nvmrc), Python 3.9+, GDAL 3.9+ (`bre
 ```bash
 npm install
 npm run fetch:source   # ~3 GB from NASA, checksums verified against provenance/sources.json
-npm run build:tiles    # ~350 MB of tiles into public/tiles/blue-marble/, zoom 0-8
+npm run build:tiles    # Blue Marble: ~350 MB of tiles into public/tiles/blue-marble/, zoom 0-8
+npm run build:grey     # optional: the Grey base map (~6 min, ~600 MB on disk)
 npm run dev
 ```
+
+The vector layers (borders, states, coastlines) are already in the repo; `npm run fetch:vectors` regenerates them. **[docs/building-the-tiles.md](docs/building-the-tiles.md)** explains every build step, and is also the Guide's "Build the map data" tab.
 
 `npm run verify:tiles` re-hashes the tiles and checks them against `provenance/build.json`.
 
@@ -38,10 +42,17 @@ The HTML report, including a screenshot of the globe, is in `playwright-report/`
 
 ## Layers
 
-The **Layers** button (top right) switches layers on and off, and the choices are remembered:
-- **Blue Marble:** the global base map
+The **Layers** button (top right) chooses the base map and switches overlays on and off; the choices are remembered.
+
+**Base map** (pick one):
+- **Blue Marble:** NASA satellite imagery
+- **Grey:** flat light-grey land on a dark slate ocean, from Natural Earth's 1:10m land and lakes. Build it once with `npm run build:grey` (~6 minutes, ~600 MB on disk, gitignored). The ocean isn't in the tiles: the globe's base colour shows wherever there's no land. Borders and state lines switch to dark grey on this map.
+- **None:** no imagery, a plain dark globe, so only the overlays and regions show
+
+**Overlays:**
 - **Country borders:** Natural Earth, 1:50m, public domain. Disputed segments are dashed; see `LICENSING.md` for which boundary view this is.
 - **US states:** Natural Earth, 1:50m, public domain; fainter lines under the country borders.
+- **Coastlines:** Natural Earth, 1:50m, public domain. Off by default, since both base maps already show the coast; it loads the first time you switch it on.
 
 Both vector layers are regenerated with `npm run fetch:vectors`. To add another Natural Earth layer, add an entry to `LAYERS` in `scripts/fetch_vectors.py` and `VECTORS` in `src/layers.js`.
 - **Each built Landsat region:** with an opacity slider and **Go** to fly there. A region shows from its minimum zoom inward.
@@ -99,8 +110,10 @@ provenance/sources.json     NASA URLs + SHA-256 of the exact source bytes
 provenance/build.json       GDAL version, commands, and a digest of all tiles
 provenance/terms/           archived copies of the usage terms (NASA, Natural Earth)
 provenance/vectors.json     source, checksums and conversion of each vector layer
-public/vectors/             vector layers: country borders (426 KB), US states (66 KB); committed
+public/vectors/             vector layers: country borders (426 KB), US states (66 KB), coastlines (1.3 MB); committed
 scripts/fetch_vectors.py    fetch + convert Natural Earth vector layers
+scripts/build_grey.py       build the Grey base map tiles (Natural Earth land + lakes)
+provenance/grey.json        Grey map sources, checksums, commands, timings, tile digest
 LICENSING.md                terms, quotes and conditions, with links
 NOTICE                      attribution for redistribution
 ```

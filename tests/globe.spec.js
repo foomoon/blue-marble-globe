@@ -62,6 +62,12 @@ test("globe loads every resource from its own origin, with NASA credit and no io
   await expect(page.getByRole("button", { name: "Regions" })).toHaveCount(0);
 });
 
+test("coastlines file holds real line geometry", async ({ request }) => {
+  const geo = await (await request.get("/vectors/coastlines.geojson")).json();
+  expect(geo.features.length).toBeGreaterThan(1000);
+  expect(geo.features.every((f) => /LineString/.test(f.geometry?.type ?? ""))).toBe(true);
+});
+
 test("US states file holds real line geometry", async ({ request }) => {
   const geo = await (await request.get("/vectors/us-states.geojson")).json();
   expect(geo.features.length).toBeGreaterThan(100);
@@ -79,35 +85,88 @@ test("country borders file holds real line geometry", async ({ request }) => {
 test("guide panel shows both docs", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Guide" }).click();
-  await expect(page.getByRole("tab", { name: "Build the tiles" })).toBeVisible();
-  await page.getByRole("tab", { name: "Add the layer" }).click();
-  await expect(page.getByRole("heading", { name: "4. Stay off Cesium ion" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Build the map data" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Grey base map" })).toBeVisible();
+  await page.getByRole("tab", { name: "Add layers in code" }).click();
+  await expect(page.getByRole("heading", { name: "5. A vector layer: GeoJSON lines" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "6. Stay off Cesium ion" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator(".guide-panel")).toBeHidden();
 });
 
-test("layers control lists Blue Marble and every built region, and remembers choices", async ({ page, request }) => {
+test("layers control: base maps, overlays, regions; choices are remembered", async ({ page, request }) => {
   const res = await request.get("/tiles/landsat/index.json");
   const regions = res.ok() ? (await res.json()).regions : [];
+  const greyBuilt = (await request.head("/tiles/grey/tiles.json")).ok();
 
   await page.goto("/");
   await page.getByRole("button", { name: "Layers" }).click();
   const pop = page.getByRole("dialog", { name: "Map layers" });
-  await expect(pop.getByLabel("Blue Marble")).toBeChecked();
+  await expect(pop.locator(".layers-section")).toHaveText(["Base map", "Overlays", "Regions"]);
+  await expect(pop.getByRole("radio", { name: "Blue Marble" })).toBeChecked();
+  await expect(pop.getByRole("radio", { name: "Grey" })).toBeVisible();
+  await expect(pop.getByRole("radio", { name: "None" })).toBeVisible();
   await expect(pop.getByLabel("Country borders")).toBeChecked();
   await expect(pop.getByLabel("US states")).toBeChecked();
-  for (const r of regions) await expect(pop.getByLabel(r.title, { exact: true })).toBeVisible();
-  await expect(pop.locator(".layers-row")).toHaveCount(3 + regions.length);
+  await expect(pop.getByLabel("Coastlines")).not.toBeChecked(); // off by default
+  // Each built region is listed under Regions (the last list)
+  const regionList = pop.locator(".layers-list").last();
+  for (const r of regions) await expect(regionList.getByLabel(r.title, { exact: true })).toBeVisible();
+  await expect(pop.locator(".layers-row")).toHaveCount(6 + regions.length);
 
-  // Switching Blue Marble off is remembered across a reload
-  await pop.getByLabel("Blue Marble").uncheck();
+  // Coastlines load only when first switched on
+  const coast = page.waitForResponse((r) => r.url().endsWith("/vectors/coastlines.geojson") && r.ok());
+  await pop.getByLabel("Coastlines").check();
+  await coast;
+
+  // Overlay choices are remembered across a reload
+  await pop.getByLabel("US states").uncheck();
+  if (greyBuilt) {
+    // Switching base map loads that map's tiles, and is remembered too
+    const greyTile = page.waitForResponse((r) => /\/tiles\/grey\/\d+\/\d+\/\d+\.png$/.test(r.url()) && r.ok());
+    await pop.getByRole("radio", { name: "Grey" }).check();
+    await greyTile;
+  }
   await page.reload();
   await page.getByRole("button", { name: "Layers" }).click();
-  await expect(page.getByRole("dialog", { name: "Map layers" }).getByLabel("Blue Marble")).not.toBeChecked();
+  const pop2 = page.getByRole("dialog", { name: "Map layers" });
+  await expect(pop2.getByLabel("US states")).not.toBeChecked();
+  await expect(pop2.getByLabel("Coastlines")).toBeChecked();
+  if (greyBuilt) await expect(pop2.getByRole("radio", { name: "Grey" })).toBeChecked();
 
   // Clicking elsewhere closes it
   await page.mouse.click(640, 400);
-  await expect(page.getByRole("dialog", { name: "Map layers" })).toBeHidden();
+  await expect(pop2).toBeHidden();
+});
+
+test("base map None: no base imagery is requested, overlays still load", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Layers" }).click();
+  await page.getByRole("radio", { name: "None" }).check();
+  await page.reload(); // start fresh on None, so nothing Blue Marble is already in flight
+  const baseTiles = [];
+  page.on("request", (r) => /\/tiles\/(blue-marble|grey)\/\d+\//.test(r.url()) && baseTiles.push(r.url()));
+  const borders = page.waitForResponse((r) => r.url().endsWith("/vectors/country-borders.geojson"));
+  await page.reload();
+  await borders;
+  await page.waitForTimeout(2500);
+  await page.getByRole("button", { name: "Layers" }).click();
+  await expect(page.getByRole("radio", { name: "None" })).toBeChecked();
+  expect(baseTiles, "base map tiles requested while None is selected").toEqual([]);
+});
+
+test("zooming with the cursor on the exact centre pixel doesn't stop rendering (Cesium bug workaround)", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForTimeout(2500);
+  const { width, height } = page.viewportSize();
+  await page.mouse.move(width / 2, height / 2);
+  for (let i = 0; i < 6; i++) {
+    await page.mouse.wheel(0, -400);
+    await page.waitForTimeout(250);
+  }
+  await page.waitForTimeout(1500);
+  await expect(page.locator(".cesium-widget-errorPanel")).toHaveCount(0);
+  await expect(page.locator(".coords")).not.toContainText("NaN");
 });
 
 test("lat/lon readout follows the cursor and falls back to the view centre", async ({ page }) => {

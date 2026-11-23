@@ -21,6 +21,15 @@ const nasaCredit = new Cesium.Credit(
   true, // show on screen, not only in the "Data attribution" list
 );
 
+// Work around a Cesium bug (1.147): mouse-wheel zoom with the cursor on the exact centre pixel
+// asks the camera to rotate about a zero-length axis, which throws and stops rendering for good.
+// Rotating about no axis is a no-op, so skip it.
+const cameraRotate = Cesium.Camera.prototype.rotate;
+Cesium.Camera.prototype.rotate = function (axis, angle) {
+  if (Cesium.Cartesian3.magnitudeSquared(axis) < 1e-20) return;
+  return cameraRotate.call(this, axis, angle);
+};
+
 // 1. Describe where the tiles live and how they were cut.
 const blueMarble = new Cesium.UrlTemplateImageryProvider({
   url: "/tiles/blue-marble/{z}/{x}/{y}.jpg", // public/tiles/blue-marble/
@@ -67,6 +76,6 @@ const layers = mountLayers(viewer, baseLayer);
 // 6. Dev only: the Regions studio (draw, estimate, save and build regions).
 //    Vite removes this branch from production builds, so the deployed globe never has it.
 if (import.meta.env.DEV) {
-  window.viewer = viewer; // handy in the browser console while developing
+  Object.assign(window, { viewer, Cesium }); // handy in the browser console while developing
   import("./studio/studio.js").then(({ mountStudio }) => mountStudio(viewer, layers));
 }

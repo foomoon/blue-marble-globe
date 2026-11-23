@@ -20,3 +20,11 @@
     bottom: 30px; /* above the credit bar, which wraps on narrow screens */
   }
 }
+
+/* Cesium's credit bar (bottom left): white text needs a backing to read on the Grey base map */
+.cesium-widget-credits {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(12, 18, 28, 0.7);
+  backdrop-filter: blur(6px);
+}

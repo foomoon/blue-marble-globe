@@ -92,6 +92,31 @@ test("draw a polygon by clicking corners, then save it", async ({ page }) => {
   expect(saved.bbox[2]).toBeCloseTo(Math.max(...lons), 4);
 });
 
+test("switching a built region off in Layers really hides its layer", async ({ page, request }) => {
+  const res = await request.get("/tiles/landsat/index.json");
+  const regions = res.ok() ? (await res.json()).regions : [];
+  test.skip(!regions.length, "no built regions on this machine");
+  const r = regions[0];
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Layers" }).click();
+  const box = page.getByRole("dialog", { name: "Map layers" }).getByLabel(r.title, { exact: true });
+  const shown = () =>
+    page.evaluate((name) => {
+      const L = window.viewer.imageryLayers;
+      for (let i = 0; i < L.length; i++) {
+        const l = L.get(i);
+        if (String(l.imageryProvider.url).includes(`/tiles/landsat/${name}/`)) return l.show;
+      }
+      return null;
+    }, r.name);
+  await box.check();
+  await expect.poll(shown).toBe(true);
+  await box.uncheck();
+  await expect.poll(shown).toBe(false);
+  await box.check(); // leave it as found
+});
+
 test("studio API refuses other origins", async ({ request }) => {
   const res = await request.delete(`/api/regions/${NAME}`, { headers: { Origin: "https://example.com" } });
   expect(res.status()).toBe(403);

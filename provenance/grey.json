@@ -1,0 +1,166 @@
+{
+  "description": "Grey base map: Natural Earth 1:10m land as light grey, water transparent (the globe's base colour supplies the ocean).",
+  "licence": "Public domain (Natural Earth). See provenance/terms/natural-earth-terms-of-use.md",
+  "colours": {
+    "land": "#d6#d6#d6",
+    "ocean_and_lakes": "transparent (globe base colour #3b3f45)"
+  },
+  "sources": {
+    "ne_10m_land": {
+      "url": "https://naciscdn.org/naturalearth/10m/physical/ne_10m_land.zip",
+      "file": "ne_10m_land.zip",
+      "bytes": 3269070,
+      "sha256": "e547d749445eaa0964aba76738090ec88f5e63c4585122170f98c67a7ea922dc",
+      "natural_earth_version": "5.1.1",
+      "http_etag": null,
+      "http_last_modified": null,
+      "retrieved_utc": "2026-11-23T00:24:59Z"
+    },
+    "ne_10m_lakes": {
+      "url": "https://naciscdn.org/naturalearth/10m/physical/ne_10m_lakes.zip",
+      "file": "ne_10m_lakes.zip",
+      "bytes": 2349685,
+      "sha256": "0803a06f9c3cb4671d89b68c48b142aad9366ba40f665245e12a913fbc61722a",
+      "natural_earth_version": "5.0.0",
+      "http_etag": null,
+      "http_last_modified": null,
+      "retrieved_utc": "2026-11-23T00:24:59Z"
+    }
+  },
+  "commands": [
+    [
+      "ogr2ogr",
+      "-f",
+      "GPKG",
+      "-t_srs",
+      "EPSG:3857",
+      "-clipsrc",
+      "-180",
+      "-85.05112878",
+      "180",
+      "85.05112878",
+      "data/work/grey/ne_10m_land_3857.gpkg",
+      "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_10m_land.zip/ne_10m_land.shp"
+    ],
+    [
+      "ogr2ogr",
+      "-f",
+      "GPKG",
+      "-t_srs",
+      "EPSG:3857",
+      "-clipsrc",
+      "-180",
+      "-85.05112878",
+      "180",
+      "85.05112878",
+      "data/work/grey/ne_10m_lakes_3857.gpkg",
+      "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_10m_lakes.zip/ne_10m_lakes.shp"
+    ],
+    [
+      "gdal_rasterize",
+      "-burn",
+      "214",
+      "-init",
+      "0",
+      "-a_nodata",
+      "0",
+      "-ot",
+      "Byte",
+      "-te",
+      "-20037508.342789244",
+      "-20037508.342789244",
+      "20037508.342789244",
+      "20037508.342789244",
+      "-ts",
+      "131072",
+      "131072",
+      "-co",
+      "TILED=YES",
+      "-co",
+      "COMPRESS=DEFLATE",
+      "-co",
+      "BIGTIFF=YES",
+      "data/work/grey/ne_10m_land_3857.gpkg",
+      "data/work/grey/land_3857.tif"
+    ],
+    [
+      "gdal_rasterize",
+      "-burn",
+      "0",
+      "data/work/grey/ne_10m_lakes_3857.gpkg",
+      "data/work/grey/land_3857.tif"
+    ],
+    [
+      "gdaladdo",
+      "-r",
+      "average",
+      "data/work/grey/land_3857.tif",
+      "2",
+      "4",
+      "8",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512"
+    ],
+    [
+      "/opt/homebrew/bin/gdal2tiles",
+      "--xyz",
+      "-z",
+      "0-9",
+      "-w",
+      "none",
+      "--exclude",
+      "--processes=15",
+      "data/work/grey/land_3857.tif",
+      "public/tiles/grey"
+    ]
+  ],
+  "built_utc": "2026-11-23T00:24:59Z",
+  "environment": {
+    "gdal": "GDAL 3.13.3 \"Iowa City\", released 2026/08/13",
+    "python": "3.15.2",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O"
+  },
+  "wall_clock_seconds": {
+    "total": 375.1,
+    "steps": [
+      {
+        "step": "reproject land",
+        "seconds": 0.3
+      },
+      {
+        "step": "reproject lakes",
+        "seconds": 0.2
+      },
+      {
+        "step": "rasterize land",
+        "seconds": 65.9
+      },
+      {
+        "step": "rasterize lakes",
+        "seconds": 33.3
+      },
+      {
+        "step": "overviews",
+        "seconds": 37.4
+      },
+      {
+        "step": "tile",
+        "seconds": 222.2
+      }
+    ]
+  },
+  "output": {
+    "path": "public/tiles/grey/{z}/{x}/{y}.png",
+    "zoom": [
+      0,
+      9
+    ],
+    "tile_count": 150196,
+    "bytes": 101554935,
+    "tiles_sha256": "4476e491a29a0a7d917a222562facbe14dda150614be73f3d12e3cab4ede8d9a"
+  }
+}

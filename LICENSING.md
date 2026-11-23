@@ -71,13 +71,16 @@ The scenes are *read* through Microsoft Planetary Computer's public catalogue. T
 
 > USGS's terms aren't archived in `provenance/terms/` yet, unlike NASA's. Do that before relying on this section, in the same way (`scripts/fetch_terms.py`).
 
-## 1c. Country borders and US states: Natural Earth
+## 1c. Grey base map, borders, states and coastlines: Natural Earth
 
-Both vector layers come from **Natural Earth**, version 5.1.0, at 1:50m, converted to GeoJSON by `scripts/fetch_vectors.py`:
+The vector layers come from **Natural Earth** at 1:50m (version 5.1.0 unless noted), converted to GeoJSON by `scripts/fetch_vectors.py`:
 - **Country borders:** Admin 0 land boundary lines
 - **US states:** Admin 1 state/province lines, filtered to the United States
+- **Coastlines:** Coastline (Natural Earth hasn't updated this file since version 4.1.0; `provenance/vectors.json` records each file's version)
 
 For each layer, [`provenance/vectors.json`](provenance/vectors.json) records the download URL, its SHA-256, the conversion command and the output's SHA-256.
+
+The **Grey** base map is drawn from Natural Earth's 1:10m **land** and **lakes** outlines by `scripts/build_grey.py`: land as flat grey tiles, water left transparent. [`provenance/grey.json`](provenance/grey.json) records both downloads' URLs and SHA-256, every command, and a digest of the tiles. Nothing else goes into those tiles.
 
 **Public domain.** From Natural Earth's terms of use ([archived copy](provenance/terms/natural-earth-terms-of-use.md)):
 

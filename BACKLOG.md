@@ -38,6 +38,10 @@ Fits naturally into the chunked build (per chunk).
 - Draw region polygons close to the coast (no code).
 - Fade every region's edges over a few km (fades land too).
 
+### Smaller Grey base map (skip solid tiles)
+
+The Grey map is 150,196 tiles: 102 MB of data but **592 MB on disk**, since every small file takes at least 4 KB. 73% of tiles are at zoom 9, and most of those are identical solid-grey inland squares. Skip writing solid tiles: list them in `tiles.json` as "solid", and have the globe draw a shared grey tile for them, as it already uses a shared empty tile for missing ones. That would cut the file count by about two-thirds with no visual change. Alternatively, stop at zoom 8 (~40k tiles).
+
 ### Suggest months from the region's latitude
 
 When a region is drawn, pre-fill the months: tropics: all months; northern mid-latitudes: June–September; southern mid-latitudes: December–March. Still editable.

@@ -7,6 +7,7 @@ provenance/terms/natural-earth-terms-of-use.md):
 
   country-borders  Admin 0 boundary lines (land), 1:50m, default ("de facto") edition
   us-states        Admin 1 state/province lines, 1:50m, filtered to the United States
+  coastlines       Coastline, 1:50m
 
 Writes:
   data/source/naturalearth/<zip>       the unmodified downloads (gitignored)
@@ -35,12 +36,13 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "data" / "source" / "naturalearth"
 OUT_DIR = ROOT / "public" / "vectors"
 RECORD = ROOT / "provenance" / "vectors.json"
-BASE = "https://naciscdn.org/naturalearth/50m/cultural"
+BASE = "https://naciscdn.org/naturalearth/50m"  # + /cultural or /physical
 
 LAYERS = [
     {
         "name": "country-borders",
         "dataset": "Natural Earth, Admin 0 boundary lines (land), 1:50m",
+        "category": "cultural",
         "source": "ne_50m_admin_0_boundary_lines_land",
         # Natural Earth's own class (FEATURECLA) gives the default de facto view. Anything not an
         # agreed international boundary is marked "disputed" and drawn dashed.
@@ -54,9 +56,18 @@ LAYERS = [
     {
         "name": "us-states",
         "dataset": "Natural Earth, Admin 1 states/provinces lines, 1:50m (United States only)",
+        "category": "cultural",
         "source": "ne_50m_admin_1_states_provinces_lines",
         "sql": "SELECT GEOMETRY, NAME AS name FROM {src} WHERE ADM0_A3 = 'USA'",
         "view": "Internal US state lines only; the outer US border is in country-borders.",
+    },
+    {
+        "name": "coastlines",
+        "dataset": "Natural Earth, Coastline, 1:50m",
+        "category": "physical",
+        "source": "ne_50m_coastline",
+        "sql": "SELECT GEOMETRY FROM {src}",
+        "view": "Coastlines of land masses and islands (lake shores are not included).",
     },
 ]
 
@@ -77,7 +88,7 @@ def load_records() -> dict:
 def build(layer: dict, previous: dict | None) -> dict:
     src_name = layer["source"]
     zip_path = SRC_DIR / f"{src_name}.zip"
-    url = f"{BASE}/{src_name}.zip"
+    url = f"{BASE}/{layer['category']}/{src_name}.zip"
     headers = {}
     if not zip_path.exists():
         print(f"GET  {url}")

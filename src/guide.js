@@ -6,8 +6,8 @@ import addingLayer from "../docs/adding-a-map-layer.md?raw";
 import "./guide.css";
 
 const TABS = [
-  { id: "tiles", label: "Build the tiles", md: buildingTiles },
-  { id: "layer", label: "Add the layer", md: addingLayer },
+  { id: "tiles", label: "Build the map data", md: buildingTiles },
+  { id: "layer", label: "Add layers in code", md: addingLayer },
 ];
 
 // Links to repo files (../src/main.js, LICENSING.md) mean nothing in the browser,
