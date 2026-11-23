@@ -74,48 +74,95 @@ The **Guide** button opens the project's own docs inside the app: *Build the map
 
 ![The Guide panel open on "Add layers in code"](docs/images/guide.jpg)
 
-## Regions studio (dev only)
+## Higher-resolution regions (dev only)
 
-Under `npm run dev`, a **Regions** button (top left) opens a panel for planning higher-resolution regional layers:
+Blue Marble is 500 m per pixel. For a sharper view of a particular place, draw a **region** and the app builds a **30 m Landsat 8/9 layer** for it on your machine: sixteen times sharper, from free public-domain USGS imagery. This happens in the **Regions** panel, which only exists under `npm run dev`.
 
 <p>
   <img src="docs/images/regions-studio.jpg" width="49%" alt="The Regions panel with saved regions, over Guam">
   <img src="docs/images/region-guam.jpg" width="49%" alt="Guam as a 30 m Landsat layer over the 500 m Blue Marble">
 </p>
 
-*Right: the Guam region, a 30 m Landsat composite, over Blue Marble's 500 m ocean.*
+### Before you start (once)
 
-1. Pick **Rectangle** or **Polygon**, press **New region**, and draw:
-   - Rectangle: drag on the globe.
-   - Polygon: click each corner. You can still move the globe between clicks. Double-click, press Enter, or click the first corner to finish; Backspace removes the last corner, Esc cancels.
-
-   To reshape a saved region, open it from the list and use **Redraw area**.
-2. Set the name, date range, months, cloud limit and zoom range. Tile counts per zoom level update live. They're exact, from the Web Mercator grid, and for a polygon they count only the tiles it touches. The size assumes ~20 KB per tile.
-3. **Save region** writes `regions/<name>.json` through a small API in the dev server (`server/studio.js`).
-
-Saved regions show as outlines; click one in the list to fly to it and edit it. The panel and its API exist only in the dev server: `npm run build` leaves both out, so the deployed globe is view-only. The API accepts requests only from the app's own page.
-
-### Regional Landsat layers
-
-**Save & build** (or **Build** on a saved region) turns a config into a 30 m Landsat layer over Blue Marble. The build runs on your machine, started by the dev server, and the panel shows it live:
-
-- **Progress card:** each stage (search, download, composite, tile) with a bar and detail, elapsed time, time remaining, a log, and Cancel. It survives a page reload.
-- **On the globe:** the chosen Landsat scenes' footprints appear and fill in as their pixels arrive, the composite grid lights up block by block, then the new imagery appears tile by tile.
-
-One-time setup (Homebrew's numpy can be broken, so the project uses its own):
+Region builds use Python with numpy, in the project's own virtual environment (Homebrew's numpy can be broken, so the project doesn't rely on it):
 
 ```bash
 python3 -m venv --system-site-packages .venv   # keeps access to GDAL's Python bindings
 .venv/bin/pip install --ignore-installed -r scripts/requirements.txt
 ```
 
-A region can also be built from the terminal, which prints the same progress as JSON lines: `npm run build:region -- regions/<name>.json`.
+You also need GDAL (see Quick start) and an internet connection. No account or API key is needed.
 
-How it works: scenes come from Landsat Collection 2 Level-2 (surface reflectance) via Microsoft Planetary Computer's public catalogue, with no account needed. Only the region's pixels are read from the cloud-optimised files. Clouds and shadows are masked using Landsat's own QA band, and each pixel is the median of the clear views. Tiles are WebP, so areas with no clear view, or outside a polygon boundary, stay transparent and Blue Marble shows through. Completely empty tiles aren't written; each build's `tiles.json` lists the ones that exist, so the globe never requests a tile that isn't there. Each build writes `provenance/regions/<name>.json`: every scene ID, its asset URLs, ETags and sizes, the config, timings and a tile digest.
+### 1. Draw the area
 
-`npm run test:build` runs an end-to-end test that builds a small area near Boulder through the panel, using the internet and taking about a minute.
+Run `npm run dev` and press **Regions** (top left). Choose a shape, press **New region**, and draw on the globe:
 
-Built regions show in the dev studio. Adding them to the production globe is the next step.
+- **Rectangle:** drag. The camera is locked while you draw.
+- **Polygon:** click each corner. You can still move the globe between clicks. To finish, double-click, press **Enter**, or click the first corner. **Backspace** removes the last corner, **Esc** cancels.
+
+A polygon follows the shape of the place you care about: outside it, the layer stays transparent and fewer tiles are written.
+
+![Drawing a polygon around part of the Grand Canyon](docs/images/region-1-draw.jpg)
+
+### 2. Choose the settings
+
+When you finish drawing, a form opens. Its tile table updates as you change the zoom range: an exact count from the tile grid and a size estimate (about 20 KB per tile).
+
+![The settings form with its live tile estimate](docs/images/region-2-settings.jpg)
+
+| Setting | What it does | Default and tips |
+| --- | --- | --- |
+| **Name** | The file name: `regions/<name>.json`, `public/tiles/landsat/<name>/` | Lowercase letters, numbers and dashes |
+| **Title** | What the Layers menu shows | |
+| **From / To** | Which dates' scenes to consider | June 2023 to September 2024. A longer range finds more clear views. |
+| **Months** | Which months within that range | June to September: summer, mostly cloud-free and green in the northern mid-latitudes. In the tropics, or wherever it's cloudy year-round, select every month (Guam does). |
+| **Max cloud %** | Skips scenes cloudier than this overall | 20. Clouds in the scenes that are kept get masked out pixel by pixel. |
+| **Scenes/spot** | How many of the clearest scenes to combine for each Landsat footprint. Each pixel is the median of its clear views. | 4. More fills more cloud gaps and evens out colour, but downloads more. |
+| **Zoom … to** | The zoom levels to build | 8 to 12. Zoom 12 is Landsat's full 30 m. The layer only shows from its first zoom inward; each zoom level out you add costs few tiles. |
+
+**Keep regions modest.** Build time and scratch disk grow with the area. The 714 km² demo above built in about 20 seconds, and Guam in 42. A national park or a metro area is fine. A whole state takes hours. Something the size of the continental US can't be built yet; it needs chunked builds, which are on the backlog.
+
+### 3. Save & build
+
+**Save** only writes the config. **Save & build** also starts the build. The build runs on your machine, started by the dev server, and you can watch it:
+
+![A build in progress: the progress card, and the Landsat scenes' footprints around the region](docs/images/region-3-building.jpg)
+
+- **Progress card:** the four stages with progress bars, elapsed time and time remaining. **Log** shows the build's output, and **Cancel** stops it within a second or two. Cancelling keeps the region's previous tiles, if it had any. Reloading the page reconnects to a running build.
+  - **Search:** finds Landsat scenes over the area and picks the clearest
+  - **Download:** reads only your region's pixels (its bounding rectangle) from each scene, not whole scenes
+  - **Composite:** masks clouds and shadows, and takes the median of the clear views
+  - **Tile:** cuts web map tiles
+- **On the globe:** the chosen scenes' footprints appear and fill in as their pixels arrive. The composite lights up block by block, and then the new imagery appears tile by tile.
+
+### 4. The result
+
+When the build finishes, the region appears on the globe automatically, here as sharp 30 m imagery inside the polygon over Blue Marble's 500 m blur:
+
+![The finished region: sharp Landsat imagery of the Grand Canyon inside the polygon](docs/images/region-4-done.jpg)
+
+- It's listed under **Layers → Regions**, with a toggle, an opacity slider and **Go** to fly there. It shows up in the production build too (`npm run build`).
+- **The map server** serves it after `npm run server:build`.
+- **Files:**
+  - `regions/<name>.json`: the config. Commit it.
+  - `provenance/regions/<name>.json`: the record of every Landsat scene used, with its URLs, ETags and sizes, plus the timings and a digest of the tiles. Commit it.
+  - `public/tiles/landsat/<name>/`: the tiles. Gitignored, and rebuildable from the config.
+
+### Managing regions
+
+- **Click a region's name** in the panel to fly to it. Click **Edit** to change its settings, and **Redraw area** to reshape it.
+- **Build** or **Rebuild** builds it again with its current settings. One build runs at a time.
+- **Delete** (click again to confirm) removes the config only. To remove a region's layer too, delete `public/tiles/landsat/<name>/` and its provenance file, then run `npm run build:region -- --index` to update the layer list.
+- **From the terminal:** `npm run build:region -- regions/<name>.json` builds a saved region and prints progress as JSON lines.
+
+The panel and its API exist only in the dev server. `npm run build` leaves both out, so the deployed globe is view-only. The API also refuses requests from any page other than the app's own.
+
+### How it works
+
+Scenes come from Landsat Collection 2 Level-2 (surface reflectance), through Microsoft Planetary Computer's public catalogue. Only the region's pixels are read from the cloud-optimised files. Clouds and shadows are masked using Landsat's own quality band, and each pixel is the median of the clear views. Tiles are WebP, so areas with no clear view, or outside a polygon, stay transparent and Blue Marble shows through. Completely empty tiles aren't written; each build's `tiles.json` lists the ones that exist, so the globe never requests a missing tile. USGS Landsat imagery is public domain (see [LICENSING.md](LICENSING.md)), and the globe credits USGS on screen.
+
+`npm run test:build` builds a small area near Boulder through the panel, end to end. It uses the internet and takes about a minute. `npm run screenshots -- --regions-only` retakes the screenshots above by building a demo region and then deleting it.
 
 ## Layout
 
@@ -139,7 +186,7 @@ provenance/grey.json        Grey map sources, checksums, commands, timings, tile
 scripts/build_server.py     map server catalog, TileJSON and index page (-> mapserver/www/)
 mapserver/                  map server container: nginx config, Dockerfile
 compose.yaml                runs the map server (npm run server:up)
-scripts/screenshots.mjs     regenerates the README screenshots in docs/images/ (npm run screenshots)
+scripts/screenshots.mjs     regenerates the README screenshots in docs/images/ (npm run screenshots [-- --regions])
 LICENSING.md                terms, quotes and conditions, with links
 NOTICE                      attribution for redistribution
 ```
