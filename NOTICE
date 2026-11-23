@@ -1,0 +1,12 @@
+Blue Marble Globe
+
+Map imagery: NASA Earth Observatory, Blue Marble: Next Generation.
+Used under NASA's Images and Media Usage Guidelines, archived in
+provenance/terms/nasa-images-and-media-guidelines.md
+(live: https://www.nasa.gov/nasa-brand-center/images-and-media/).
+See LICENSING.md and provenance/ for the source files, checksums and build record.
+
+This product includes CesiumJS (https://cesium.com/platform/cesiumjs/),
+Copyright 2011-2026 CesiumJS Contributors, licensed under the Apache License 2.0.
+The full licence and third-party notices are in node_modules/cesium/LICENSE.md
+and are copied to dist/cesium/LICENSE.md by the build. Keep them when you redistribute.

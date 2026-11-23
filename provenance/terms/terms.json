@@ -1,0 +1,40 @@
+{
+  "pages": [
+    {
+      "name": "nasa-images-and-media-guidelines",
+      "title": "NASA Images and Media Usage Guidelines",
+      "why": "NASA-wide terms: copyright status, permission, endorsement, logos",
+      "url": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "final_url": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "retrieved_utc": "2026-11-22T20:31:09Z",
+      "http_last_modified": null,
+      "raw_file": "raw/nasa-images-and-media-guidelines.html",
+      "raw_sha256": "977f64377c443b0451d0dad8fd4ab6acc7b0c6473db211c2372fe30dfa3a9906",
+      "text_file": "nasa-images-and-media-guidelines.md"
+    },
+    {
+      "name": "nasa-blue-marble-next-generation",
+      "title": "NASA Earth Observatory: Blue Marble Next Generation",
+      "why": "Dataset page: producer and the requested credit line",
+      "url": "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/",
+      "final_url": "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/",
+      "retrieved_utc": "2026-11-22T20:31:09Z",
+      "http_last_modified": null,
+      "raw_file": "raw/nasa-blue-marble-next-generation.html",
+      "raw_sha256": "6e99dd4d3e17d5d80e79e405bd5ed9cf901bbd8c5634276f08f20fd62e73aba8",
+      "text_file": "nasa-blue-marble-next-generation.md"
+    },
+    {
+      "name": "natural-earth-terms-of-use",
+      "title": "Natural Earth: Terms of Use",
+      "why": "Licence for the country-border vector layer (public domain)",
+      "url": "https://www.naturalearthdata.com/about/terms-of-use/",
+      "final_url": "https://www.naturalearthdata.com/about/terms-of-use/",
+      "retrieved_utc": "2026-11-22T23:55:44Z",
+      "http_last_modified": "Sun, 22 Nov 2026 23:45:44 GMT",
+      "raw_file": "raw/natural-earth-terms-of-use.html",
+      "raw_sha256": "724fc67818dd31e4b5ab7067631c3454b43389c9ff0c9eb6327d6aa9077ecde4",
+      "text_file": "natural-earth-terms-of-use.md"
+    }
+  ]
+}

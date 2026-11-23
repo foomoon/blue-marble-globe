@@ -1,0 +1,87 @@
+{
+  "dataset": "NASA Blue Marble: Next Generation, topography + bathymetry, August 2004, 500 m",
+  "publisher": "NASA Earth Observatory (NASA Goddard Space Flight Center)",
+  "landing_page": "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/",
+  "files": [
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.A1_geo.tif",
+      "tile": "A1",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x21600x21600.A1_geo.tif",
+      "bytes": 408007930,
+      "sha256": "d76d3816d02b73fe34611dbe95ce9b32e890ca7e740ce415f519f48d7e4d6355",
+      "http_etag": "\"1851b4fa-6461699556800\"",
+      "http_last_modified": "Tue, 16 Dec 2025 19:18:56 GMT",
+      "retrieved_utc": "2026-11-22T20:04:24Z"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.B1_geo.tif",
+      "tile": "B1",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x21600x21600.B1_geo.tif",
+      "bytes": 427810557,
+      "sha256": "16df5c4e2b28fb5843f4d9ad4d4af099838a264951addd20c808528ea34379dc",
+      "http_etag": "\"197fdefd-64616a0026400\"",
+      "http_last_modified": "Tue, 16 Dec 2025 19:20:48 GMT",
+      "retrieved_utc": "2026-11-22T20:04:38Z"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.C1_geo.tif",
+      "tile": "C1",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x21600x21600.C1_geo.tif",
+      "bytes": 728943740,
+      "sha256": "d3dc48d245a6c4639e731b3d379225bad4b3192bf7e67668756e58a2834a6441",
+      "http_etag": "\"2b72cc7c-64616acf18c40\"",
+      "http_last_modified": "Tue, 16 Dec 2025 19:24:25 GMT",
+      "retrieved_utc": "2026-11-22T20:05:04Z"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.D1_geo.tif",
+      "tile": "D1",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x21600x21600.D1_geo.tif",
+      "bytes": 520084962,
+      "sha256": "8ff82113118e386deb793fc9c4ff42a4f337851366f5bf5a896d37a39f6dc132",
+      "http_etag": "\"1effdde2-64616b7320f40\"",
+      "http_last_modified": "Tue, 16 Dec 2025 19:27:17 GMT",
+      "retrieved_utc": "2026-11-22T20:05:21Z"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.A2_geo.tif",
+      "tile": "A2",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x21600x21600.A2_geo.tif",
+      "bytes": 147798707,
+      "sha256": "e97c073003439c87020dba11aceabf929366ea741b226e95559ddf3d9eaab7aa",
+      "http_etag": "\"8cf3ab3-646169b6b76c0\"",
+      "http_last_modified": "Tue, 16 Dec 2025 19:19:31 GMT",
+      "retrieved_utc": "2026-11-22T20:05:26Z"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.B2_geo.tif",
+      "tile": "B2",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x21600x21600.B2_geo.tif",
+      "bytes": 350725694,
+      "sha256": "f8312880b46ac38d5f6357b559e2ed26470faaceab38e696e7000d0f38321af5",
+      "http_etag": "\"14e7a63e-64616a43dc3c0\"",
+      "http_last_modified": "Tue, 16 Dec 2025 19:21:59 GMT",
+      "retrieved_utc": "2026-11-22T20:05:38Z"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.C2_geo.tif",
+      "tile": "C2",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x21600x21600.C2_geo.tif",
+      "bytes": 327500377,
+      "sha256": "a3f17cc8ff8a9f0ca1405ae92e33a0f1f1eb3a46deac40d3bfb7635ecae554cf",
+      "http_etag": "\"13854259-64616b0851340\"",
+      "http_last_modified": "Tue, 16 Dec 2025 19:25:25 GMT",
+      "retrieved_utc": "2026-11-22T20:05:48Z"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.D2_geo.tif",
+      "tile": "D2",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x21600x21600.D2_geo.tif",
+      "bytes": 355573272,
+      "sha256": "a79f4dd650cb5c1cfaffe4abd00b8cfabeb94d76b2b3aa853660fa39f0533879",
+      "http_etag": "\"15319e18-64616bb3fa840\"",
+      "http_last_modified": "Tue, 16 Dec 2025 19:28:25 GMT",
+      "retrieved_utc": "2026-11-22T20:06:00Z"
+    }
+  ]
+}

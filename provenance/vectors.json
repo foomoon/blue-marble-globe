@@ -1,0 +1,82 @@
+{
+  "layers": {
+    "country-borders": {
+      "dataset": "Natural Earth, Admin 0 boundary lines (land), 1:50m",
+      "publisher": "Natural Earth (naturalearthdata.com), supported by NACIS",
+      "licence": "Public domain. See provenance/terms/natural-earth-terms-of-use.md",
+      "natural_earth_version": "5.1.0",
+      "boundary_view": "Natural Earth default edition: de facto control. Disputed, indefinite and line-of-control segments are kept, marked kind=disputed, and drawn dashed.",
+      "source": {
+        "url": "https://naciscdn.org/naturalearth/50m/cultural/ne_50m_admin_0_boundary_lines_land.zip",
+        "file": "ne_50m_admin_0_boundary_lines_land.zip",
+        "bytes": 309389,
+        "sha256": "02f369ae10578c4ce33fc4a08f8cdd69ea11eb39b44d7923e88eb7199aaff8ea",
+        "http_etag": "\"2c6695791ef99755162094e7bfad97b2\"",
+        "http_last_modified": "Fri, 13 May 2022 05:21:46 GMT",
+        "retrieved_utc": "2026-11-22T23:58:54Z"
+      },
+      "conversion": [
+        "ogr2ogr",
+        "-f",
+        "GeoJSON",
+        "-a_srs",
+        "EPSG:4326",
+        "-lco",
+        "RFC7946=YES",
+        "-lco",
+        "COORDINATE_PRECISION=4",
+        "-dialect",
+        "SQLite",
+        "-sql",
+        "SELECT GEOMETRY, NAME AS name, CASE WHEN FEATURECLA LIKE 'International boundary%' THEN 'international' ELSE 'disputed' END AS kind, FEATURECLA AS natural_earth_class FROM ne_50m_admin_0_boundary_lines_land",
+        "public/vectors/country-borders.geojson",
+        "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_50m_admin_0_boundary_lines_land.zip/ne_50m_admin_0_boundary_lines_land.shp"
+      ],
+      "output": {
+        "path": "public/vectors/country-borders.geojson",
+        "features": 390,
+        "bytes": 426093,
+        "sha256": "1fedef0809f3cdede10b389b9a4ccd424d723c3c9a0782abd71e8d7c6c40457e"
+      }
+    },
+    "us-states": {
+      "dataset": "Natural Earth, Admin 1 states/provinces lines, 1:50m (United States only)",
+      "publisher": "Natural Earth (naturalearthdata.com), supported by NACIS",
+      "licence": "Public domain. See provenance/terms/natural-earth-terms-of-use.md",
+      "natural_earth_version": "5.1.0",
+      "boundary_view": "Internal US state lines only; the outer US border is in country-borders.",
+      "source": {
+        "url": "https://naciscdn.org/naturalearth/50m/cultural/ne_50m_admin_1_states_provinces_lines.zip",
+        "file": "ne_50m_admin_1_states_provinces_lines.zip",
+        "bytes": 261730,
+        "sha256": "464e762020d198257a07f5f62eb7cbfc287fccbc0a6db788d8068b49844d951e",
+        "http_etag": "\"4f1373b05294a5848886e72f0f6a30a5\"",
+        "http_last_modified": "Fri, 13 May 2022 05:21:46 GMT",
+        "retrieved_utc": "2026-11-23T00:01:31Z"
+      },
+      "conversion": [
+        "ogr2ogr",
+        "-f",
+        "GeoJSON",
+        "-a_srs",
+        "EPSG:4326",
+        "-lco",
+        "RFC7946=YES",
+        "-lco",
+        "COORDINATE_PRECISION=4",
+        "-dialect",
+        "SQLite",
+        "-sql",
+        "SELECT GEOMETRY, NAME AS name FROM ne_50m_admin_1_states_provinces_lines WHERE ADM0_A3 = 'USA'",
+        "public/vectors/us-states.geojson",
+        "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_50m_admin_1_states_provinces_lines.zip/ne_50m_admin_1_states_provinces_lines.shp"
+      ],
+      "output": {
+        "path": "public/vectors/us-states.geojson",
+        "features": 125,
+        "bytes": 66210,
+        "sha256": "db76fb63412ae3d5d2231ddcaa4eb15a6b90eb9ea6005c82dbe0345ab860a1a5"
+      }
+    }
+  }
+}

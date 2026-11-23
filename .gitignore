@@ -1,0 +1,17 @@
+node_modules
+.venv/
+dist
+test-results/
+playwright-report/
+.DS_Store
+
+# NASA source downloads and intermediates (multi-GB, reproducible via npm run fetch:source)
+data/
+
+# Generated tiles (~350 MB, reproducible via npm run build:tiles).
+# Their checksums are committed in provenance/build.json.
+public/tiles/
+
+# Python bytecode
+__pycache__/
+*.pyc

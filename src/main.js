@@ -1,0 +1,72 @@
+// A clean globe on self-hosted NASA Blue Marble tiles.
+// docs/adding-a-map-layer.md walks through each step.
+// LICENSING.md explains why these tiles need no licence.
+import * as Cesium from "cesium";
+import "cesium/Build/Cesium/Widgets/widgets.css";
+import { mountGuide } from "./guide.js";
+import { mountLayers } from "./layers.js";
+import { mountCoords } from "./coords.js";
+
+// 0. No Cesium ion. Cesium puts an ion logo in the credit bar by default, even when
+//    nothing uses ion; remove it. Also blank the built-in demo token, so an
+//    accidental ion request fails loudly instead of quietly working.
+Cesium.CreditDisplay.cesiumCredit = undefined;
+Cesium.Ion.defaultAccessToken = "";
+
+// The credit NASA asks for, linking to the dataset and to NASA's usage terms
+// (archived in provenance/terms/). Links only: nothing is fetched from NASA.
+const nasaCredit = new Cesium.Credit(
+  'Imagery: <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/" target="_blank" rel="noopener">NASA Earth Observatory, Blue Marble: Next Generation</a>' +
+    ' · <a href="https://www.nasa.gov/nasa-brand-center/images-and-media/" target="_blank" rel="noopener">usage terms</a>',
+  true, // show on screen, not only in the "Data attribution" list
+);
+
+// 1. Describe where the tiles live and how they were cut.
+const blueMarble = new Cesium.UrlTemplateImageryProvider({
+  url: "/tiles/blue-marble/{z}/{x}/{y}.jpg", // public/tiles/blue-marble/
+  tilingScheme: new Cesium.WebMercatorTilingScheme(), // gdal2tiles --xyz, EPSG:3857
+  maximumLevel: 8, // highest zoom built by scripts/build_tiles.py
+  credit: nasaCredit,
+});
+
+// 2. Create the viewer with that layer as the base map, and no UI chrome.
+const baseLayer = new Cesium.ImageryLayer(blueMarble);
+const viewer = new Cesium.Viewer("globe", {
+  baseLayer,
+  animation: false,
+  baseLayerPicker: false,
+  fullscreenButton: false,
+  geocoder: false, // the geocoder would call Cesium ion
+  homeButton: false,
+  infoBox: false,
+  navigationHelpButton: false,
+  sceneModePicker: false,
+  selectionIndicator: false,
+  timeline: false,
+});
+
+// 3. Optional polish: Mercator tiles stop at about ±85°, so tint the poles ocean blue.
+viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#0b1a2e");
+
+// 4. Don't draw Cesium's moon: its bundled texture has no clear public-domain source
+//    (see LICENSING.md). The build also leaves that file out.
+viewer.scene.moon.show = false;
+
+mountGuide();
+
+// Lat/lon readout, bottom right
+mountCoords(viewer);
+
+// Vector layers (country borders) are entities; Cesium's default double-click would lock the
+// camera onto whichever one is under the cursor, so switch that off.
+viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+// 5. Layers control: Blue Marble plus any built Landsat regions (public/tiles/landsat/index.json)
+const layers = mountLayers(viewer, baseLayer);
+
+// 6. Dev only: the Regions studio (draw, estimate, save and build regions).
+//    Vite removes this branch from production builds, so the deployed globe never has it.
+if (import.meta.env.DEV) {
+  window.viewer = viewer; // handy in the browser console while developing
+  import("./studio/studio.js").then(({ mountStudio }) => mountStudio(viewer, layers));
+}

@@ -1,0 +1,134 @@
+{
+  "description": "Web Mercator XYZ tiles built from the NASA source files listed in sources.json.",
+  "modifications": [
+    "mosaic of the 8 source tiles",
+    "reprojection EPSG:4326 -> EPSG:3857, bilinear resampling",
+    "cropped to the Web Mercator extent (about ±85.05° latitude)",
+    "downsampled to 65536 px square (zoom 8) and averaged overviews for zoom 0-7",
+    "JPEG encoding, quality 85"
+  ],
+  "not_modified": "no colour correction, no compositing with other data, no added labels",
+  "built_utc": "2026-11-22T20:08:59Z",
+  "environment": {
+    "gdal": "GDAL 3.13.3 \"Iowa City\", released 2026/08/13",
+    "python": "3.15.2",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O"
+  },
+  "inputs": [
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.A1_geo.tif",
+      "sha256": "d76d3816d02b73fe34611dbe95ce9b32e890ca7e740ce415f519f48d7e4d6355"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.B1_geo.tif",
+      "sha256": "16df5c4e2b28fb5843f4d9ad4d4af099838a264951addd20c808528ea34379dc"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.C1_geo.tif",
+      "sha256": "d3dc48d245a6c4639e731b3d379225bad4b3192bf7e67668756e58a2834a6441"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.D1_geo.tif",
+      "sha256": "8ff82113118e386deb793fc9c4ff42a4f337851366f5bf5a896d37a39f6dc132"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.A2_geo.tif",
+      "sha256": "e97c073003439c87020dba11aceabf929366ea741b226e95559ddf3d9eaab7aa"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.B2_geo.tif",
+      "sha256": "f8312880b46ac38d5f6357b559e2ed26470faaceab38e696e7000d0f38321af5"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.C2_geo.tif",
+      "sha256": "a3f17cc8ff8a9f0ca1405ae92e33a0f1f1eb3a46deac40d3bfb7635ecae554cf"
+    },
+    {
+      "file": "world.topo.bathy.200408.3x21600x21600.D2_geo.tif",
+      "sha256": "a79f4dd650cb5c1cfaffe4abd00b8cfabeb94d76b2b3aa853660fa39f0533879"
+    }
+  ],
+  "sources_json_sha256": "69fd1977892d45870c35f30cb9d82550c69dca6f11f527e3aec9612427c58200",
+  "commands": [
+    [
+      "gdalbuildvrt",
+      "-overwrite",
+      "data/work/bmng.vrt",
+      "data/source/bmng/world.topo.bathy.200408.3x21600x21600.A1_geo.tif",
+      "data/source/bmng/world.topo.bathy.200408.3x21600x21600.B1_geo.tif",
+      "data/source/bmng/world.topo.bathy.200408.3x21600x21600.C1_geo.tif",
+      "data/source/bmng/world.topo.bathy.200408.3x21600x21600.D1_geo.tif",
+      "data/source/bmng/world.topo.bathy.200408.3x21600x21600.A2_geo.tif",
+      "data/source/bmng/world.topo.bathy.200408.3x21600x21600.B2_geo.tif",
+      "data/source/bmng/world.topo.bathy.200408.3x21600x21600.C2_geo.tif",
+      "data/source/bmng/world.topo.bathy.200408.3x21600x21600.D2_geo.tif"
+    ],
+    [
+      "gdalwarp",
+      "-overwrite",
+      "-t_srs",
+      "EPSG:3857",
+      "-te",
+      "-20037508.342789244",
+      "-20037508.342789244",
+      "20037508.342789244",
+      "20037508.342789244",
+      "-ts",
+      "65536",
+      "65536",
+      "-r",
+      "bilinear",
+      "-multi",
+      "-wo",
+      "NUM_THREADS=ALL_CPUS",
+      "-wm",
+      "2048",
+      "-co",
+      "TILED=YES",
+      "-co",
+      "COMPRESS=DEFLATE",
+      "-co",
+      "BIGTIFF=YES",
+      "data/work/bmng.vrt",
+      "data/work/bmng_3857.tif"
+    ],
+    [
+      "gdaladdo",
+      "-r",
+      "average",
+      "data/work/bmng_3857.tif",
+      "2",
+      "4",
+      "8",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256"
+    ],
+    [
+      "gdal2tiles",
+      "--xyz",
+      "-z",
+      "0-8",
+      "-w",
+      "none",
+      "--processes=15",
+      "--tiledriver=JPEG",
+      "--jpeg-quality=85",
+      "data/work/bmng_3857.tif",
+      "public/tiles/blue-marble"
+    ]
+  ],
+  "output": {
+    "path": "public/tiles/blue-marble/{z}/{x}/{y}.jpg",
+    "zoom": [
+      0,
+      8
+    ],
+    "tile_count": 87381,
+    "bytes": 349025758,
+    "tiles_sha256": "647bdf648c2be7e780460e5937805b4a13db45d19ed4e076a8ebc94789cb4c7b",
+    "tiles_sha256_method": "sha256 of the sorted lines '<z/x/y.jpg> <sha256 of file>', joined by \\n"
+  }
+}
