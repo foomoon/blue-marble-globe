@@ -22,7 +22,8 @@
     "test:build": "BUILD_TEST=1 playwright test tests/build.spec.js --project=dev",
     "build:region": ".venv/bin/python scripts/build_region.py",
     "clean": "rm -rf dist data/work test-results playwright-report",
-    "clean:source": "rm -rf data/source"
+    "clean:source": "rm -rf data/source",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
     "cesium": "^1.136.0",

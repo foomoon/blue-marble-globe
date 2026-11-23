@@ -2,6 +2,8 @@
 
 A clean CesiumJS globe on self-hosted NASA Blue Marble tiles. It needs no API keys, no online map services and no licence, and every tile can be traced back to the exact NASA files it came from.
 
+![The globe on Blue Marble, with country borders and US states](docs/images/globe-blue-marble.jpg)
+
 - **How to build the map data:** [docs/building-the-tiles.md](docs/building-the-tiles.md)
 - **How to add imagery and vector layers in code:** [docs/adding-a-map-layer.md](docs/adding-a-map-layer.md)
 - **Why no licence is needed:** [LICENSING.md](LICENSING.md), backed by archived copies of [NASA's usage guidelines](provenance/terms/nasa-images-and-media-guidelines.md)
@@ -37,12 +39,17 @@ The HTML report, including a screenshot of the globe, is in `playwright-report/`
 | --- | --- | --- |
 | `data/source/` | 3.0 GB | Kept, so you can rebuild without downloading again. `npm run clean:source` removes it; `fetch:source` re-downloads and re-verifies it. |
 | `data/work/` | ~4 GB | Deleted automatically after a successful build (`--keep-work` keeps it) |
-| `dist/` | ~550 MB | Output of `npm run build`, including a copy of the tiles. `npm run clean` removes it and `data/work/`. |
-| `public/tiles/` | ~350 MB | The tiles. Keep them. |
+| `dist/` | ~1.1 GB | Output of `npm run build`, including a copy of the tiles. `npm run clean` removes it and `data/work/`. |
+| `public/tiles/` | ~1.1 GB on disk | The tiles: Blue Marble 357 MB, Grey 132 MB of data but ~600 MB on disk (150,000 small files). Keep them. |
 
 ## Layers
 
 The **Layers** button (top right) chooses the base map and switches overlays on and off; the choices are remembered.
+
+<p>
+  <img src="docs/images/layers-menu.jpg" width="49%" alt="The Layers menu: base map, overlays and regions">
+  <img src="docs/images/globe-grey.jpg" width="49%" alt="The Grey base map with country borders and coastlines">
+</p>
 
 **Base map** (pick one):
 - **Blue Marble:** NASA satellite imagery
@@ -54,14 +61,29 @@ The **Layers** button (top right) chooses the base map and switches overlays on 
 - **US states:** Natural Earth, 1:50m, public domain; fainter lines under the country borders.
 - **Coastlines:** Natural Earth, 1:50m, public domain. Off by default, since both base maps already show the coast; it loads the first time you switch it on.
 
-Both vector layers are regenerated with `npm run fetch:vectors`. To add another Natural Earth layer, add an entry to `LAYERS` in `scripts/fetch_vectors.py` and `VECTORS` in `src/layers.js`.
+**Regions:**
 - **Each built Landsat region:** with an opacity slider and **Go** to fly there. A region shows from its minimum zoom inward.
 
+The vector layers are regenerated with `npm run fetch:vectors`. To add another Natural Earth layer, add an entry to `LAYERS` in `scripts/fetch_vectors.py` and `VECTORS` in `src/layers.js`.
+
 The bottom-right corner shows the latitude/longitude under the cursor, or the centre of the view.
+
+## Guide
+
+The **Guide** button opens the project's own docs inside the app: *Build the map data*, *Add layers in code* and *Serve to other maps*. It renders the files in `docs/` directly, so the app and the docs can't drift apart.
+
+![The Guide panel open on "Add layers in code"](docs/images/guide.jpg)
 
 ## Regions studio (dev only)
 
 Under `npm run dev`, a **Regions** button (top left) opens a panel for planning higher-resolution regional layers:
+
+<p>
+  <img src="docs/images/regions-studio.jpg" width="49%" alt="The Regions panel with saved regions, over Guam">
+  <img src="docs/images/region-guam.jpg" width="49%" alt="Guam as a 30 m Landsat layer over the 500 m Blue Marble">
+</p>
+
+*Right: the Guam region, a 30 m Landsat composite, over Blue Marble's 500 m ocean.*
 
 1. Pick **Rectangle** or **Polygon**, press **New region**, and draw:
    - Rectangle: drag on the globe.
@@ -117,6 +139,7 @@ provenance/grey.json        Grey map sources, checksums, commands, timings, tile
 scripts/build_server.py     map server catalog, TileJSON and index page (-> mapserver/www/)
 mapserver/                  map server container: nginx config, Dockerfile
 compose.yaml                runs the map server (npm run server:up)
+scripts/screenshots.mjs     regenerates the README screenshots in docs/images/ (npm run screenshots)
 LICENSING.md                terms, quotes and conditions, with links
 NOTICE                      attribution for redistribution
 ```
@@ -135,6 +158,8 @@ npm run server:build   # after building or rebuilding a layer: refresh the catal
 ```
 
 The full guide is [docs/map-server.md](docs/map-server.md), also in the app's Guide under *Serve to other maps*. Open **http://localhost:8080** for every layer with a preview, its attribution and copy-paste code for each library. Pick a different port with `MAPSERVER_PORT=9000 npm run server:up`.
+
+![The map server's index page: each layer with a preview, attribution and code](docs/images/map-server.jpg)
 
 | URL | What |
 | --- | --- |
