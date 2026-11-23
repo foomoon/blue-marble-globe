@@ -99,7 +99,7 @@ Built regions show in the dev studio. Adding them to the production globe is the
 
 ```
 src/main.js                 the whole app: one imagery layer on a bare viewer
-src/guide.js                in-app Guide panel (renders docs/*.md)
+src/guide.js                in-app Guide panel (renders docs/*.md: building, adding layers, map server)
 src/studio/                 dev-only Regions panel: drawing, tile estimates
 server/studio.js            dev-only API: saves regions/*.json, runs and streams builds
 scripts/build_region.py     Landsat region build (search, read, composite, tile)
@@ -114,11 +114,48 @@ public/vectors/             vector layers: country borders (426 KB), US states (
 scripts/fetch_vectors.py    fetch + convert Natural Earth vector layers
 scripts/build_grey.py       build the Grey base map tiles (Natural Earth land + lakes)
 provenance/grey.json        Grey map sources, checksums, commands, timings, tile digest
+scripts/build_server.py     map server catalog, TileJSON and index page (-> mapserver/www/)
+mapserver/                  map server container: nginx config, Dockerfile
+compose.yaml                runs the map server (npm run server:up)
 LICENSING.md                terms, quotes and conditions, with links
 NOTICE                      attribution for redistribution
 ```
 
 The source data (`data/`) and tiles (`public/tiles/`) are gitignored because they are large and fully reproducible. The provenance files are committed.
+
+## Map server
+
+Serves the layers you've built to **any web map** (Leaflet, MapLibre, OpenLayers, Cesium, QGIS) as standard XYZ tiles, TileJSON and GeoJSON, from a Docker container. Needs Docker (Desktop) running.
+
+```bash
+npm run server:up      # write the catalog, build the image, start on http://localhost:8080
+npm run test:server    # check it end to end (6 tests)
+npm run server:down    # stop it
+npm run server:build   # after building or rebuilding a layer: refresh the catalog (no restart needed)
+```
+
+The full guide is [docs/map-server.md](docs/map-server.md), also in the app's Guide under *Serve to other maps*. Open **http://localhost:8080** for every layer with a preview, its attribution and copy-paste code for each library. Pick a different port with `MAPSERVER_PORT=9000 npm run server:up`.
+
+| URL | What |
+| --- | --- |
+| `/catalog.json` | Every layer: id, kind, URLs, zoom range, bounds, attribution, licence, provenance |
+| `/tiles/<layer>/tilejson.json` | [TileJSON 3.0.0](https://github.com/mapbox/tilejson-spec): all a web map needs, including the attribution |
+| `/tiles/<layer>/{z}/{x}/{y}.<ext>` | Web Mercator XYZ tiles, 256 px. Tiles a layer deliberately lacks (ocean in Grey, outside a region) answer **204** (blank), not 404. |
+| `/vectors/<name>.geojson` | The vector layers, as-is |
+| `/provenance/`, `/licensing`, `/notice` | The build records, LICENSING.md and NOTICE |
+
+For example, in MapLibre, given only the TileJSON URL:
+
+```js
+map.addSource("grey", { type: "raster", url: "http://localhost:8080/tiles/grey/tilejson.json", tileSize: 256 });
+map.addLayer({ id: "grey", type: "raster", source: "grey" });
+```
+
+**How it works.** `scripts/build_server.py` reads the provenance records and writes the catalog, TileJSON and index page to `mapserver/www/` (gitignored). The container is plain nginx (`mapserver/`). The tiles, vectors and provenance are **mounted read-only, not copied**, so the image stays tiny and a rebuilt layer is live straight away. Any site may load the layers (CORS `*`, including Chrome's private-network preflight for LAN use). Tiles are cached for a day, and metadata is always revalidated.
+
+**Addresses.** URLs in the catalog and TileJSON are absolute, built from whatever address a client used (`localhost`, a LAN IP, a hostname). Behind a reverse proxy or CDN, publish one fixed address instead with `python3 scripts/build_server.py --base-url https://maps.example.com`. The proxy terminates TLS; the server honours `X-Forwarded-Proto`.
+
+**Note:** Chrome won't let a page on the public internet load from `localhost` or a private IP, whatever the server allows. For a public site, host the server at a public address.
 
 ## Deploying
 

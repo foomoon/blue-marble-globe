@@ -113,7 +113,7 @@ test("fresh clone (no tiles built): falls back to None, explains how to build, n
   await expect(page.getByRole("heading", { name: "Building the map data" })).toBeVisible();
 });
 
-test("guide panel shows both docs", async ({ page }) => {
+test("guide panel shows all three docs", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Guide" }).click();
   await expect(page.getByRole("tab", { name: "Build the map data" })).toBeVisible();
@@ -121,6 +121,9 @@ test("guide panel shows both docs", async ({ page }) => {
   await page.getByRole("tab", { name: "Add layers in code" }).click();
   await expect(page.getByRole("heading", { name: "5. A vector layer: GeoJSON lines" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "6. Stay off Cesium ion" })).toBeVisible();
+  await page.getByRole("tab", { name: "Serve to other maps" }).click();
+  await expect(page.getByRole("heading", { name: "Serving layers to other maps" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "4. Use it from a web map" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator(".guide-panel")).toBeHidden();
 });

@@ -15,3 +15,6 @@ public/tiles/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Map server metadata, generated from the layers built on this machine (npm run server:build)
+mapserver/www/

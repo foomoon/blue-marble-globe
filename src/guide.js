@@ -3,11 +3,13 @@
 import { Marked } from "marked";
 import buildingTiles from "../docs/building-the-tiles.md?raw";
 import addingLayer from "../docs/adding-a-map-layer.md?raw";
+import mapServer from "../docs/map-server.md?raw";
 import "./guide.css";
 
 const TABS = [
   { id: "tiles", label: "Build the map data", md: buildingTiles },
   { id: "layer", label: "Add layers in code", md: addingLayer },
+  { id: "server", label: "Serve to other maps", md: mapServer },
 ];
 
 // Links to repo files (../src/main.js, LICENSING.md) mean nothing in the browser,

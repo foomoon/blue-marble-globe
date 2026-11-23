@@ -1,0 +1,17 @@
+# Map server: serves the layers built in this project to other web maps.
+#   npm run server:up      generate metadata, then start on http://localhost:8080
+#   npm run server:down    stop it
+services:
+  mapserver:
+    build: ./mapserver
+    image: blue-marble-globe/mapserver
+    ports:
+      - "${MAPSERVER_PORT:-8080}:8080"
+    volumes:
+      - ./mapserver/www:/srv/www:ro          # catalog, TileJSON, index (scripts/build_server.py)
+      - ./public/tiles:/srv/tiles:ro         # Blue Marble, Grey, Landsat regions
+      - ./public/vectors:/srv/vectors:ro     # GeoJSON layers
+      - ./provenance:/srv/provenance:ro      # checksums, build records, archived terms
+      - ./LICENSING.md:/srv/docs/LICENSING.md:ro
+      - ./NOTICE:/srv/docs/NOTICE:ro
+    restart: unless-stopped

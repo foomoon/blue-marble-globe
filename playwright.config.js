@@ -19,6 +19,7 @@ export default defineConfig({
   projects: [
     { name: "prod", testMatch: "globe.spec.js", use: { baseURL: "http://localhost:4173" } },
     { name: "dev", testMatch: /(studio|build)\.spec\.js/, use: { baseURL: "http://localhost:5174" } },
+    { name: "server", testMatch: "server.spec.js" }, // the Docker map server (npm run test:server)
   ],
   webServer: [
     {
