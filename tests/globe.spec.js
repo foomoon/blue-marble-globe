@@ -58,6 +58,9 @@ test("globe loads every resource from its own origin, with NASA credit and no io
   );
   await expect(page.locator('img[src*="ion-credit"]')).toHaveCount(0);
 
+  // Tiles are built here, so no first-run notice
+  await expect(page.getByText("No base map built yet")).toBeHidden();
+
   // The dev-only studio must not ship
   await expect(page.getByRole("button", { name: "Regions" })).toHaveCount(0);
 });
@@ -80,6 +83,34 @@ test("country borders file holds real line geometry", async ({ request }) => {
   const lines = geo.features.filter((f) => /LineString/.test(f.geometry?.type ?? ""));
   expect(lines.length, "features with LineString geometry").toBe(geo.features.length);
   expect(geo.features.some((f) => f.properties.kind === "disputed")).toBe(true);
+});
+
+test("fresh clone (no tiles built): falls back to None, explains how to build, no tile 404s", async ({ page }) => {
+  await page.route("**/tiles/**", (r) => r.fulfill({ status: 404, body: "not found" }));
+  const tileGets = [];
+  page.on("request", (r) => {
+    if (r.method() === "GET" && /\/tiles\/(blue-marble|grey)\/\d+\//.test(r.url())) tileGets.push(r.url());
+  });
+  await page.goto("/");
+
+  const notice = page.getByRole("status").filter({ hasText: "No base map built yet" });
+  await expect(notice).toBeVisible();
+  await page.getByRole("button", { name: "Layers" }).click();
+  const pop = page.getByRole("dialog", { name: "Map layers" });
+  await expect(pop.getByRole("radio", { name: "None" })).toBeChecked();
+  await expect(pop.getByRole("radio", { name: "Blue Marble" })).toBeDisabled();
+  await expect(pop.locator(".layers-row", { hasText: "Blue Marble" })).toContainText("npm run fetch:source && npm run build:tiles");
+  await expect(pop.getByRole("radio", { name: "Grey" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+
+  // No NASA credit for imagery that isn't there, and no tile requests beyond the existence checks
+  await expect(page.getByText("NASA Earth Observatory, Blue Marble: Next Generation")).toHaveCount(0);
+  expect(tileGets).toEqual([]);
+
+  // "How to build it" opens the Guide on the right tab
+  await notice.getByRole("button", { name: "How to build it" }).click();
+  await expect(page.getByRole("tab", { name: "Build the map data" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Building the map data" })).toBeVisible();
 });
 
 test("guide panel shows both docs", async ({ page }) => {
@@ -145,7 +176,8 @@ test("base map None: no base imagery is requested, overlays still load", async (
   await page.getByRole("radio", { name: "None" }).check();
   await page.reload(); // start fresh on None, so nothing Blue Marble is already in flight
   const baseTiles = [];
-  page.on("request", (r) => /\/tiles\/(blue-marble|grey)\/\d+\//.test(r.url()) && baseTiles.push(r.url()));
+  // GETs only: the HEAD requests are the "is this base map built?" checks, not tile downloads
+  page.on("request", (r) => r.method() === "GET" && /\/tiles\/(blue-marble|grey)\/\d+\//.test(r.url()) && baseTiles.push(r.url()));
   const borders = page.waitForResponse((r) => r.url().endsWith("/vectors/country-borders.geojson"));
   await page.reload();
   await borders;

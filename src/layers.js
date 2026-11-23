@@ -9,13 +9,23 @@ const STORE = "layers";
 // Base maps: exactly one is shown. The globe's base colour fills anywhere the tiles don't cover
 // (Blue Marble's poles; all of Grey's water, since Grey's tiles are land only).
 const BASES = [
-  { name: "blue-marble", title: "Blue Marble", detail: "NASA · satellite imagery, 500 m", baseColor: "#0b1a2e", atmosphere: true },
+  {
+    name: "blue-marble",
+    title: "Blue Marble",
+    detail: "NASA · satellite imagery, 500 m",
+    probe: "/tiles/blue-marble/0/0/0.jpg", // exists once built
+    build: "npm run fetch:source && npm run build:tiles",
+    baseColor: "#0b1a2e",
+    atmosphere: true,
+  },
   {
     name: "grey",
     title: "Grey",
     detail: "Natural Earth · land and lakes",
     url: "/tiles/grey/{z}/{x}/{y}.png",
     index: "/tiles/grey/tiles.json",
+    probe: "/tiles/grey/tiles.json",
+    build: "npm run build:grey",
     maximumLevel: 9,
     baseColor: "#3b3f45",
     atmosphere: false, // the blue atmosphere haze would tint the greys
@@ -155,13 +165,14 @@ export function mountLayers(viewer, baseLayer) {
     }
     return materials[role];
   };
-  const baseBuilt = new Map([["blue-marble", true], ["none", true]]); // name -> true / false (not built) / undefined (checking)
+  const baseBuilt = new Map([["none", true]]); // name -> true / false (not built) / undefined (checking)
   let currentBase = prefs.base ?? "blue-marble";
   const atmosphereDefaults = {
     fadeIn: viewer.scene.globe.lightingFadeInDistance,
     fadeOut: viewer.scene.globe.lightingFadeOutDistance,
   };
-  baseLayer.show = currentBase === "blue-marble"; // right away, before any Blue Marble tile is requested
+  // Hidden until we know its tiles exist: on a fresh clone that avoids a burst of 404s
+  baseLayer.show = false;
 
   const toggle = el("button", "layers-toggle", "Layers");
   toggle.setAttribute("aria-expanded", "false");
@@ -194,6 +205,7 @@ export function mountLayers(viewer, baseLayer) {
 
   // ---- base maps ----
   async function ensureBase(def) {
+    if (baseBuilt.get(def.name) === false) return null;
     if (baseLayers.has(def.name)) return baseLayers.get(def.name);
     if (!def.url) return true; // "None": nothing to load
     const available = await availability({ tiles_index: def.index });
@@ -208,8 +220,15 @@ export function mountLayers(viewer, baseLayer) {
   }
 
   async function setBase(name) {
-    const def = BASES.find((b) => b.name === name) ?? BASES[0];
-    if (!(await ensureBase(def))) return setBase("blue-marble"); // not built: fall back
+    // Use the requested map if it's built, else the first built one; "none" always is
+    let def = null;
+    for (const candidate of [name, ...BASES.map((b) => b.name)]) {
+      const d = BASES.find((b) => b.name === candidate);
+      if (d && (await ensureBase(d))) {
+        def = d;
+        break;
+      }
+    }
     currentBase = def.name;
     for (const [n, layer] of baseLayers) layer.show = n === currentBase;
     viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString(def.baseColor);
@@ -221,18 +240,39 @@ export function mountLayers(viewer, baseLayer) {
     globe.lightingFadeOutDistance = def.atmosphere ? atmosphereDefaults.fadeOut : Number.MAX_VALUE;
     restyleVectors();
     render();
+    updateNotice();
   }
 
-  // Find out which base maps are built (cheap HEAD request), without downloading their tile lists yet
+  // Find out which base maps are built (a cheap HEAD request each), without downloading tiles yet
   const basesChecked = Promise.all(
-    BASES.filter((b) => b.index).map(async (b) => {
+    BASES.filter((b) => b.probe).map(async (b) => {
       try {
-        baseBuilt.set(b.name, (await fetch(b.index, { method: "HEAD" })).ok);
+        baseBuilt.set(b.name, (await fetch(b.probe, { method: "HEAD" })).ok);
       } catch {
         baseBuilt.set(b.name, false);
       }
     }),
   ).then(() => setBase(currentBase));
+
+  // First-run notice: shown when no base map with tiles has been built yet
+  const notice = el("div", "first-run");
+  notice.hidden = true;
+  notice.setAttribute("role", "status");
+  notice.innerHTML = `<span>No base map built yet. The globe shows overlays only.</span>
+    <button class="first-run-how">How to build it</button><button class="first-run-close" aria-label="Dismiss">×</button>`;
+  document.body.append(notice);
+  let noticeDismissed = false;
+  notice.querySelector(".first-run-how").addEventListener("click", () =>
+    document.dispatchEvent(new CustomEvent("guide:open", { detail: { tab: "tiles" } })),
+  );
+  notice.querySelector(".first-run-close").addEventListener("click", () => {
+    noticeDismissed = true;
+    updateNotice();
+  });
+  function updateNotice() {
+    const anyBuilt = BASES.some((b) => b.probe && baseBuilt.get(b.name));
+    notice.hidden = noticeDismissed || anyBuilt;
+  }
 
   function apply(name) {
     const entry = regions.get(name);
@@ -269,7 +309,7 @@ export function mountLayers(viewer, baseLayer) {
     li.innerHTML = `<input type="radio" name="basemap" id="${id}"><label for="${id}"><strong></strong><span></span></label>`;
     li.querySelector("strong").textContent = b.title;
     const built = baseBuilt.get(b.name);
-    li.querySelector("span").textContent = built === false ? "not built yet: npm run build:grey" : b.detail;
+    li.querySelector("span").textContent = built === false ? `not built yet: ${b.build}` : b.detail;
     const radio = li.querySelector("input");
     radio.setAttribute("aria-label", b.title);
     radio.checked = b.name === currentBase;

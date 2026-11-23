@@ -68,6 +68,11 @@ export function mountGuide(parent = document.body) {
   }
 
   toggle.addEventListener("click", () => setOpen(panel.hidden));
+  // Other parts of the app can open a given tab, e.g. the first-run notice
+  document.addEventListener("guide:open", (e) => {
+    if (e.detail?.tab) show(e.detail.tab);
+    setOpen(true);
+  });
   close.addEventListener("click", () => setOpen(false));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !panel.hidden) setOpen(false);

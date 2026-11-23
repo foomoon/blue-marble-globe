@@ -125,3 +125,52 @@
     width: auto;
   }
 }
+
+/* First-run notice: no base map built yet */
+.first-run {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 9;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 260px);
+  padding: 6px 6px 6px 14px;
+  border: 1px solid rgba(255, 210, 124, 0.5);
+  border-radius: 999px;
+  background: var(--guide-bg);
+  color: var(--guide-fg);
+  font: 13px var(--guide-font);
+  backdrop-filter: blur(8px);
+}
+.first-run[hidden] {
+  display: none;
+}
+.first-run-how {
+  padding: 4px 12px;
+  border: 1px solid var(--guide-accent);
+  border-radius: 999px;
+  background: rgba(124, 183, 255, 0.15);
+  color: var(--guide-fg);
+  font: 500 12px var(--guide-font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.first-run-close {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--guide-muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+@media (max-width: 600px) {
+  .first-run {
+    top: 60px;
+    max-width: calc(100vw - 16px);
+  }
+}
