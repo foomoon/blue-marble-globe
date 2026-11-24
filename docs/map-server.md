@@ -32,13 +32,17 @@ The container reads `public/tiles/` and `public/vectors/` directly (mounted read
 | `/catalog.json` | Every layer, machine-readable: id, kind, URLs, zoom range, bounds, attribution, licence, provenance |
 | `/tiles/<layer>/tilejson.json` | TileJSON 3.0.0: tile URL, zoom range, bounds and attribution in one file. Most web maps can take this alone. |
 | `/tiles/<layer>/{z}/{x}/{y}.<ext>` | The tiles: Web Mercator, XYZ order, 256 px |
+| `/tiles/terrain/{z}/{x}/{y}.webp` | Elevation tiles (global terrain): colours encode height; see *MapLibre: 3D terrain* below |
+| `/tiles/landsat/<region>/terrain/{z}/{x}/{y}.webp` | A region's own elevation tiles (USGS 3DEP 10 m or NASADEM 30 m) |
 | `/vectors/<name>.geojson` | Borders, US states, coastlines, unchanged |
 | `/provenance/` | Every build record and archived terms |
 | `/licensing`, `/notice` | `LICENSING.md` and `NOTICE` |
 
-Layer ids are `blue-marble`, `grey`, `landsat/<region>` (for example `landsat/guam`), and `country-borders`, `us-states`, `coastlines` for the vectors. Only layers you've built appear.
+Layer ids are `blue-marble`, `grey`, `landsat/<region>` (for example `landsat/guam`), `terrain` and `landsat/<region>/terrain` for elevation, and `country-borders`, `us-states`, `coastlines` for the vectors. Only layers you've built appear.
 
-**Missing tiles answer `204 No Content`, not `404`.** Grey has no ocean tiles and a region has none outside its area; those were skipped on purpose. `204` tells a web map "blank here" without logging an error.
+**Missing imagery tiles answer `204 No Content`, not `404`.** Grey has no ocean tiles and a region has none outside its area; those were skipped on purpose. `204` tells a web map "blank here" without logging an error.
+
+**Missing terrain tiles answer a flat sea-level tile.** The terrain builds skip tiles that are all sea, but MapLibre's 3D terrain needs a real tile everywhere: a `204` there makes it fail with "dem dimension mismatch".
 
 ## 4. Use it from a web map
 
@@ -53,6 +57,8 @@ A map needs **one base map** underneath, then any overlays on top:
 | Blue Marble | base map | `/tiles/blue-marble/{z}/{x}/{y}.jpg` | 0–8 |
 | Grey | base map (transparent water: give the map a dark background) | `/tiles/grey/{z}/{x}/{y}.png` | 0–9 |
 | Landsat region | detail overlay for one area | `/tiles/landsat/<region>/{z}/{x}/{y}.webp` | per region, e.g. Guam 8–12 |
+| Terrain | elevation, for 3D and hillshading | `/tiles/terrain/{z}/{x}/{y}.webp` | 0–8 |
+| A region's terrain | sharper elevation for one area | `/tiles/landsat/<region>/terrain/{z}/{x}/{y}.webp` | per region, e.g. Guam 8–14 |
 | Borders, US states, coastlines | line overlays | `/vectors/<name>.geojson` | any |
 
 **About zoom.** A layer's top zoom is how much detail its source has, not a limit on the map. Blue Marble is 500 m per pixel, and zoom 8 already shows all of it. You can keep zooming in; the library enlarges the zoom-8 tiles, so they just get softer. Tell it the top zoom (`maximumLevel` in Cesium, `maxNativeZoom` in Leaflet; MapLibre and OpenLayers read it from the TileJSON), or it will ask for tiles that don't exist. For sharp imagery closer in, lay a **Landsat region** (30 m, to zoom 12) over the base map. Build one in the Regions panel and it appears on the server.
@@ -126,6 +132,19 @@ map.addLayer({ id: "grey", type: "raster", source: "grey" });
 map.addSource("borders", { type: "geojson", data: "http://localhost:8080/vectors/country-borders.geojson" });
 map.addLayer({ id: "borders", type: "line", source: "borders", paint: { "line-color": "#555", "line-width": 1 } });
 ```
+
+### MapLibre: 3D terrain
+
+The terrain tiles are a `raster-dem` source in the "terrarium" encoding. MapLibre raises the map with them and can shade them too:
+
+```js
+map.addSource("dem", { type: "raster-dem", url: "http://localhost:8080/tiles/terrain/tilejson.json",
+                       tileSize: 256, encoding: "terrarium" });
+map.setTerrain({ source: "dem", exaggeration: 2 });                 // 3D
+map.addLayer({ id: "hills", type: "hillshade", source: "dem" });   // shaded relief
+```
+
+For one region, use its terrain instead (`/tiles/landsat/guam/terrain/tilejson.json`). It covers the region's box. Inside its outline it's the region's own 10 m or 30 m data, blending into the global heights at the edge, so it has no cliff there. MapLibre takes one terrain source at a time.
 
 ### Leaflet
 

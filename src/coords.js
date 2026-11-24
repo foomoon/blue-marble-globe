@@ -16,10 +16,20 @@ export function mountCoords(viewer) {
   terrainLine.className = "coords-terrain";
   terrainLine.hidden = true;
   const posLine = document.createElement("div");
+  // What the numbers are measured against: the WGS84 ellipsoid (Cesium's Earth model, and GPS's)
+  // for latitude and longitude; mean sea level for the altitude, which isn't the ellipsoid
+  const datum = document.createElement("span");
+  datum.className = "coords-datum";
+  datum.textContent = "WGS84  ";
+  datum.title = "Latitude and longitude on the WGS84 ellipsoid: Cesium's model of the Earth's shape, as used by GPS.";
   const posText = document.createElement("span");
   const altText = document.createElement("span"); // filled in when the terrain lookup returns
   altText.className = "coords-alt";
-  posLine.append(posText, altText);
+  posLine.append(datum, posText, altText);
+  altText.title =
+    "Altitude above mean sea level (MSL), as each terrain source defines it: EGM2008 for NOAA ETOPO, EGM96 for " +
+    "NASADEM, the national datum for USGS 3DEP (e.g. NAVD88). Not above the WGS84 ellipsoid: sea level is up to " +
+    "about 100 m above or below it, depending on place, so a GPS (ellipsoidal) altitude differs by that much.";
   box.append(terrainLine, posLine);
   document.body.append(box);
 
@@ -42,7 +52,7 @@ export function mountCoords(viewer) {
       } catch {}
       if (wanted) continue; // the cursor has moved on: skip showing this one
       terrainLine.hidden = !t;
-      altText.textContent = t ? `  ${`${Math.round(t.sea ? 0 : t.height).toLocaleString("en")} m`.padStart(7)}` : "";
+      altText.textContent = t ? `  ${`${Math.round(t.sea ? 0 : t.height).toLocaleString("en")} m`.padStart(7)} MSL` : "";
       if (t) {
         const spacing = `≈${Number(t.detail.toPrecision(2)).toLocaleString("en")} m`;
         terrainLine.textContent = t.sea ? `${t.source} · sea level` : `${t.source} · ${spacing} detail`;

@@ -1,0 +1,405 @@
+{
+  "region": {
+    "name": "everest",
+    "title": "Mount Everest",
+    "bbox": [
+      86.87716,
+      27.74999,
+      87.21799,
+      28.04424
+    ],
+    "dates": [
+      "2023-06-01",
+      "2024-09-30"
+    ],
+    "months": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "max_cloud_percent": 20,
+    "scenes_per_location": 4,
+    "zoom": [
+      8,
+      12
+    ],
+    "terrain": true,
+    "stretch": [
+      0,
+      0.3
+    ],
+    "gamma": 1.6,
+    "updated_utc": "2026-11-24T01:39:04Z"
+  },
+  "region_config_sha256": "52474bced806ef92606be6a093d6e9a6381f98599a21f40ea8a9f800c51ad56b",
+  "data": {
+    "dataset": "Landsat 8-9 OLI Collection 2 Level-2 surface reflectance",
+    "producer": "U.S. Geological Survey (USGS) / NASA",
+    "accessed_via": "Microsoft Planetary Computer STAC API (landsat-c2-l2); asset URLs below are unsigned",
+    "credit": "Landsat imagery courtesy of the U.S. Geological Survey"
+  },
+  "catalogue_query": {
+    "collections": [
+      "landsat-c2-l2"
+    ],
+    "bbox": [
+      86.87716,
+      27.74999,
+      87.21799,
+      28.04424
+    ],
+    "datetime": "2023-06-01T00:00:00Z/2024-09-30T23:59:59Z",
+    "query": {
+      "eo:cloud_cover": {
+        "lt": 20
+      },
+      "platform": {
+        "in": [
+          "landsat-8",
+          "landsat-9"
+        ]
+      }
+    },
+    "limit": 250
+  },
+  "scenes_found": 49,
+  "scenes": [
+    {
+      "id": "LC09_L2SP_140040_20230608_02_T1",
+      "datetime": "2023-06-08T04:41:11.470608Z",
+      "platform": "landsat-9",
+      "cloud_cover": 3.05,
+      "wrs_path": "140",
+      "wrs_row": "040",
+      "window": [
+        0,
+        0,
+        1280,
+        845
+      ],
+      "assets": {
+        "red": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/040/LC09_L2SP_140040_20230608_20230610_02_T1/LC09_L2SP_140040_20230608_20230610_02_T1_SR_B4.TIF",
+          "etag": "\"0x8DB697FFDA8A902\"",
+          "bytes": 94023576,
+          "last_modified": "Sat, 10 Jun 2023 06:57:44 GMT"
+        },
+        "green": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/040/LC09_L2SP_140040_20230608_20230610_02_T1/LC09_L2SP_140040_20230608_20230610_02_T1_SR_B3.TIF",
+          "etag": "\"0x8DB697FFD3C89BD\"",
+          "bytes": 92291116,
+          "last_modified": "Sat, 10 Jun 2023 06:57:43 GMT"
+        },
+        "blue": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/040/LC09_L2SP_140040_20230608_20230610_02_T1/LC09_L2SP_140040_20230608_20230610_02_T1_SR_B2.TIF",
+          "etag": "\"0x8DB697FFCC12A86\"",
+          "bytes": 89389924,
+          "last_modified": "Sat, 10 Jun 2023 06:57:42 GMT"
+        },
+        "qa_pixel": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/040/LC09_L2SP_140040_20230608_20230610_02_T1/LC09_L2SP_140040_20230608_20230610_02_T1_QA_PIXEL.TIF",
+          "etag": "\"0x8DB697FFBAADAD8\"",
+          "bytes": 1978736,
+          "last_modified": "Sat, 10 Jun 2023 06:57:40 GMT"
+        }
+      }
+    },
+    {
+      "id": "LC09_L2SP_140040_20240930_02_T1",
+      "datetime": "2024-09-30T04:41:40.792925Z",
+      "platform": "landsat-9",
+      "cloud_cover": 4.13,
+      "wrs_path": "140",
+      "wrs_row": "040",
+      "window": [
+        0,
+        0,
+        1280,
+        848
+      ],
+      "assets": {
+        "red": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/040/LC09_L2SP_140040_20240930_20241001_02_T1/LC09_L2SP_140040_20240930_20241001_02_T1_SR_B4.TIF",
+          "etag": "\"0x8DCE25FDFF5A632\"",
+          "bytes": 98084400,
+          "last_modified": "Tue, 01 Oct 2024 21:27:38 GMT"
+        },
+        "green": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/040/LC09_L2SP_140040_20240930_20241001_02_T1/LC09_L2SP_140040_20240930_20241001_02_T1_SR_B3.TIF",
+          "etag": "\"0x8DCE25FDF6FF579\"",
+          "bytes": 97023738,
+          "last_modified": "Tue, 01 Oct 2024 21:27:37 GMT"
+        },
+        "blue": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/040/LC09_L2SP_140040_20240930_20241001_02_T1/LC09_L2SP_140040_20240930_20241001_02_T1_SR_B2.TIF",
+          "etag": "\"0x8DCE25FDE3810D2\"",
+          "bytes": 95149317,
+          "last_modified": "Tue, 01 Oct 2024 21:27:35 GMT"
+        },
+        "qa_pixel": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/040/LC09_L2SP_140040_20240930_20241001_02_T1/LC09_L2SP_140040_20240930_20241001_02_T1_QA_PIXEL.TIF",
+          "etag": "\"0x8DCE25FDDA88022\"",
+          "bytes": 3620862,
+          "last_modified": "Tue, 01 Oct 2024 21:27:34 GMT"
+        }
+      }
+    },
+    {
+      "id": "LC09_L2SP_140040_20240610_02_T1",
+      "datetime": "2024-06-10T04:41:05.219028Z",
+      "platform": "landsat-9",
+      "cloud_cover": 5.74,
+      "wrs_path": "140",
+      "wrs_row": "040",
+      "window": [
+        0,
+        0,
+        1280,
+        844
+      ],
+      "assets": {
+        "red": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/040/LC09_L2SP_140040_20240610_20240612_02_T1/LC09_L2SP_140040_20240610_20240612_02_T1_SR_B4.TIF",
+          "etag": "\"0x8DC8AC9925A885B\"",
+          "bytes": 94617736,
+          "last_modified": "Wed, 12 Jun 2024 10:22:32 GMT"
+        },
+        "green": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/040/LC09_L2SP_140040_20240610_20240612_02_T1/LC09_L2SP_140040_20240610_20240612_02_T1_SR_B3.TIF",
+          "etag": "\"0x8DC8AC991DAC471\"",
+          "bytes": 92922799,
+          "last_modified": "Wed, 12 Jun 2024 10:22:31 GMT"
+        },
+        "blue": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/040/LC09_L2SP_140040_20240610_20240612_02_T1/LC09_L2SP_140040_20240610_20240612_02_T1_SR_B2.TIF",
+          "etag": "\"0x8DC8AC99160ED59\"",
+          "bytes": 90200494,
+          "last_modified": "Wed, 12 Jun 2024 10:22:31 GMT"
+        },
+        "qa_pixel": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/040/LC09_L2SP_140040_20240610_20240612_02_T1/LC09_L2SP_140040_20240610_20240612_02_T1_QA_PIXEL.TIF",
+          "etag": "\"0x8DC8AC990498B89\"",
+          "bytes": 2047922,
+          "last_modified": "Wed, 12 Jun 2024 10:22:29 GMT"
+        }
+      }
+    },
+    {
+      "id": "LC08_L2SP_140040_20230616_02_T1",
+      "datetime": "2023-06-16T04:41:13.963555Z",
+      "platform": "landsat-8",
+      "cloud_cover": 9.69,
+      "wrs_path": "140",
+      "wrs_row": "040",
+      "window": [
+        0,
+        0,
+        1280,
+        844
+      ],
+      "assets": {
+        "red": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/040/LC08_L2SP_140040_20230616_20230623_02_T1/LC08_L2SP_140040_20230616_20230623_02_T1_SR_B4.TIF",
+          "etag": "\"0x8DB73A1B92028BF\"",
+          "bytes": 95147849,
+          "last_modified": "Fri, 23 Jun 2023 04:24:23 GMT"
+        },
+        "green": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/040/LC08_L2SP_140040_20230616_20230623_02_T1/LC08_L2SP_140040_20230616_20230623_02_T1_SR_B3.TIF",
+          "etag": "\"0x8DB73A1B8ADEF93\"",
+          "bytes": 93691292,
+          "last_modified": "Fri, 23 Jun 2023 04:24:22 GMT"
+        },
+        "blue": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/040/LC08_L2SP_140040_20230616_20230623_02_T1/LC08_L2SP_140040_20230616_20230623_02_T1_SR_B2.TIF",
+          "etag": "\"0x8DB73A1B83CC7AE\"",
+          "bytes": 91109779,
+          "last_modified": "Fri, 23 Jun 2023 04:24:22 GMT"
+        },
+        "qa_pixel": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/040/LC08_L2SP_140040_20230616_20230623_02_T1/LC08_L2SP_140040_20230616_20230623_02_T1_QA_PIXEL.TIF",
+          "etag": "\"0x8DB73A1B72C42B6\"",
+          "bytes": 2424447,
+          "last_modified": "Fri, 23 Jun 2023 04:24:20 GMT"
+        }
+      }
+    },
+    {
+      "id": "LC09_L2SP_140041_20240930_02_T1",
+      "datetime": "2024-09-30T04:42:04.688177Z",
+      "platform": "landsat-9",
+      "cloud_cover": 11.32,
+      "wrs_path": "140",
+      "wrs_row": "041",
+      "window": [
+        0,
+        0,
+        1280,
+        1280
+      ],
+      "assets": {
+        "red": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/041/LC09_L2SP_140041_20240930_20241001_02_T1/LC09_L2SP_140041_20240930_20241001_02_T1_SR_B4.TIF",
+          "etag": "\"0x8DCE25FEFB48FF6\"",
+          "bytes": 97415444,
+          "last_modified": "Tue, 01 Oct 2024 21:28:05 GMT"
+        },
+        "green": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/041/LC09_L2SP_140041_20240930_20241001_02_T1/LC09_L2SP_140041_20240930_20241001_02_T1_SR_B3.TIF",
+          "etag": "\"0x8DCE25FEEFE1AF8\"",
+          "bytes": 97561436,
+          "last_modified": "Tue, 01 Oct 2024 21:28:03 GMT"
+        },
+        "blue": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/041/LC09_L2SP_140041_20240930_20241001_02_T1/LC09_L2SP_140041_20240930_20241001_02_T1_SR_B2.TIF",
+          "etag": "\"0x8DCE25FEE73B4A0\"",
+          "bytes": 95861087,
+          "last_modified": "Tue, 01 Oct 2024 21:28:03 GMT"
+        },
+        "qa_pixel": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2024/140/041/LC09_L2SP_140041_20240930_20241001_02_T1/LC09_L2SP_140041_20240930_20241001_02_T1_QA_PIXEL.TIF",
+          "etag": "\"0x8DCE25FEDAED0F9\"",
+          "bytes": 3785643,
+          "last_modified": "Tue, 01 Oct 2024 21:28:01 GMT"
+        }
+      }
+    },
+    {
+      "id": "LC09_L2SP_140041_20230608_02_T1",
+      "datetime": "2023-06-08T04:41:35.361622Z",
+      "platform": "landsat-9",
+      "cloud_cover": 12.62,
+      "wrs_path": "140",
+      "wrs_row": "041",
+      "window": [
+        0,
+        0,
+        1280,
+        1280
+      ],
+      "assets": {
+        "red": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/041/LC09_L2SP_140041_20230608_20230610_02_T1/LC09_L2SP_140041_20230608_20230610_02_T1_SR_B4.TIF",
+          "etag": "\"0x8DB69800CA479FD\"",
+          "bytes": 94355964,
+          "last_modified": "Sat, 10 Jun 2023 06:58:09 GMT"
+        },
+        "green": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/041/LC09_L2SP_140041_20230608_20230610_02_T1/LC09_L2SP_140041_20230608_20230610_02_T1_SR_B3.TIF",
+          "etag": "\"0x8DB69800C3A7D52\"",
+          "bytes": 92586258,
+          "last_modified": "Sat, 10 Jun 2023 06:58:08 GMT"
+        },
+        "blue": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/041/LC09_L2SP_140041_20230608_20230610_02_T1/LC09_L2SP_140041_20230608_20230610_02_T1_SR_B2.TIF",
+          "etag": "\"0x8DB69800BCE3707\"",
+          "bytes": 91141093,
+          "last_modified": "Sat, 10 Jun 2023 06:58:07 GMT"
+        },
+        "qa_pixel": {
+          "href": "https://landsateuwest.blob.core.windows.net/landsat-c2/level-2/standard/oli-tirs/2023/140/041/LC09_L2SP_140041_20230608_20230610_02_T1/LC09_L2SP_140041_20230608_20230610_02_T1_QA_PIXEL.TIF",
+          "etag": "\"0x8DB69800AB946AB\"",
+          "bytes": 3887861,
+          "last_modified": "Sat, 10 Jun 2023 06:58:05 GMT"
+        }
+      }
+    }
+  ],
+  "scenes_failed": [],
+  "processing": [
+    "per scene: red/green/blue bilinear-warped and QA_PIXEL nearest-warped to EPSG:3857 at the zoom-max grid",
+    "per pixel: reject QA_PIXEL fill, dilated cloud, cirrus, cloud and cloud shadow",
+    "per pixel: median of the remaining scenes, reflectance = DN * 2.75e-5 - 0.2",
+    "stretch [0, 0.3] -> 0-1, gamma 1.6, -> 0-255; transparent where no clear view",
+    "gdal2tiles --xyz, WebP quality 85, fully transparent tiles not written; tiles.json lists the rest"
+  ],
+  "commands": [
+    [
+      "/opt/homebrew/bin/gdal2tiles",
+      "--xyz",
+      "-z",
+      "8-12",
+      "-w",
+      "none",
+      "--processes=15",
+      "--tiledriver=WEBP",
+      "--webp-quality=85",
+      "--exclude",
+      "data/regions-work/everest/composite.tif",
+      "public/tiles/landsat/everest"
+    ]
+  ],
+  "built_utc": "2026-11-24T01:39:04Z",
+  "environment": {
+    "gdal": "3.13.3",
+    "numpy": "2.5.5",
+    "python": "3.15.2",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O"
+  },
+  "wall_clock_seconds": {
+    "total": 24.5,
+    "steps": {
+      "search": 1.0,
+      "download": 13.7,
+      "composite": 1.1,
+      "tile": 1.0,
+      "terrain": 7.6
+    }
+  },
+  "output": {
+    "path": "public/tiles/landsat/everest/{z}/{x}/{y}.webp",
+    "zoom": [
+      8,
+      12
+    ],
+    "clear_view_fraction": 1.0,
+    "tile_count": 42,
+    "bytes": 335690,
+    "tiles_sha256": "eef7028e1782da61d3a229f10cf74953e48ae4650c10e2b4025123e2f9e040f2"
+  },
+  "terrain": {
+    "sources": [
+      {
+        "dataset": "NASADEM",
+        "collection": "nasadem",
+        "licence": "No restrictions (NASA, CC0)",
+        "items": [
+          {
+            "id": "NASADEM_HGT_n28e087",
+            "href": "https://nasademeuwest.blob.core.windows.net/nasadem-cog/v001/NASADEM_HGT_n28e087.tif"
+          },
+          {
+            "id": "NASADEM_HGT_n28e086",
+            "href": "https://nasademeuwest.blob.core.windows.net/nasadem-cog/v001/NASADEM_HGT_n28e086.tif"
+          },
+          {
+            "id": "NASADEM_HGT_n27e087",
+            "href": "https://nasademeuwest.blob.core.windows.net/nasadem-cog/v001/NASADEM_HGT_n27e087.tif"
+          },
+          {
+            "id": "NASADEM_HGT_n27e086",
+            "href": "https://nasademeuwest.blob.core.windows.net/nasadem-cog/v001/NASADEM_HGT_n27e086.tif"
+          }
+        ]
+      }
+    ],
+    "label": "NASADEM",
+    "credit": "Terrain: NASA JPL, NASADEM",
+    "detail_m": 30,
+    "zoom": [
+      8,
+      12
+    ],
+    "encoding": "Terrarium, lossless WebP; heights rounded to whole metres, sea at 0; blue = share of the regional source (0-255)",
+    "edges": "blended into the global terrain over 2000 m inside the outline; global heights outside it",
+    "tile_count": 42,
+    "bytes": 1583324,
+    "seconds": {
+      "read": 5.3,
+      "total": 7.6
+    },
+    "tiles_sha256": "c2f06f24f1ddc49d90f0792bd83faad3f1567153000795eaf241a803d7df2748",
+    "path": "public/tiles/landsat/everest/terrain/{z}/{x}/{y}.webp"
+  }
+}

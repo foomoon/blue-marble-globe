@@ -78,7 +78,7 @@ The **Layers** button (top right) chooses the base map and switches overlays on 
 
 The vector layers are regenerated with `npm run fetch:vectors`. To add another Natural Earth layer, add an entry to `LAYERS` in `scripts/fetch_vectors.py` and `VECTORS` in `src/layers.js`.
 
-The bottom-right corner shows the latitude, longitude and (with terrain on) altitude under the cursor, or at the centre of the view. The line above says where the altitude comes from and how much detail the terrain has there, e.g. `NOAA ETOPO 2022 · ≈540 m detail`. Altitudes are averages over that distance, so sharp peaks read low: Everest shows about 8,370 m, not 8,849 m.
+The bottom-right corner shows the latitude, longitude and (with terrain on) altitude under the cursor, or at the centre of the view, labelled with what they're measured against: **WGS84** for latitude and longitude (the ellipsoid that is Cesium's Earth model, and GPS's), and **MSL** for altitude (above mean sea level, not the ellipsoid; the two differ by up to about 100 m depending on place). Hover over either for details. The line above says where the altitude comes from and how much detail the terrain has there, e.g. `NOAA ETOPO 2022 · ≈540 m detail`. Altitudes are averages over that distance, so sharp peaks read low: Everest shows about 8,400 m, not 8,849 m.
 
 ## Guide
 
@@ -132,6 +132,7 @@ When you finish drawing, a form opens. Its tile table updates as you change the 
 | **Max cloud %** | Skips scenes cloudier than this overall | 20. Clouds in the scenes that are kept get masked out pixel by pixel. |
 | **Scenes/spot** | How many of the clearest scenes to combine for each Landsat footprint. Each pixel is the median of its clear views. | 4. More fills more cloud gaps and evens out colour, but downloads more. |
 | **Zoom … to** | The zoom levels to build | 8 to 12. Zoom 12 is Landsat's full 30 m. The layer only shows from its first zoom inward; each zoom level out you add costs few tiles. |
+| **Terrain** | Builds detailed terrain for the region too | On. USGS 3DEP at 10 m in the US (including Alaska, Hawaii and territories such as Guam), NASADEM at 30 m elsewhere between 60° N and 56° S. Beyond those, the region uses the global terrain. Adds about a minute and a few MB. |
 
 **Keep regions modest.** Build time and scratch disk grow with the area. The 714 km² demo above built in about 20 seconds, and Guam in 42. A national park or a metro area is fine. A whole state takes hours. Something the size of the continental US can't be built yet; it needs chunked builds, which are on the backlog.
 
@@ -141,11 +142,12 @@ When you finish drawing, a form opens. Its tile table updates as you change the 
 
 ![A build in progress: the progress card, and the Landsat scenes' footprints around the region](docs/images/region-3-building.jpg)
 
-- **Progress card:** the four stages with progress bars, elapsed time and time remaining. **Log** shows the build's output, and **Cancel** stops it within a second or two. Cancelling keeps the region's previous tiles, if it had any. Reloading the page reconnects to a running build.
+- **Progress card:** the five stages with progress bars, elapsed time and time remaining. **Log** shows the build's output, and **Cancel** stops it within a second or two. Cancelling keeps the region's previous tiles, if it had any. Reloading the page reconnects to a running build.
   - **Search:** finds Landsat scenes over the area and picks the clearest
   - **Download:** reads only your region's pixels (its bounding rectangle) from each scene, not whole scenes
   - **Composite:** masks clouds and shadows, and takes the median of the clear views
   - **Tile:** cuts web map tiles
+  - **Terrain:** reads the region's elevation (3DEP, or NASADEM where 3DEP has none), blends it into the global terrain over its last 2 km so there's no step at the edge, and cuts elevation tiles to zoom 14 (3DEP) or 12 (NASADEM). If it fails, the imagery still stands and the region uses the global terrain.
 - **On the globe:** the chosen scenes' footprints appear and fill in as their pixels arrive. The composite lights up block by block, and then the new imagery appears tile by tile.
 
 ### 4. The result
@@ -159,7 +161,8 @@ When the build finishes, the region appears on the globe automatically, here as 
 - **Files:**
   - `regions/<name>.json`: the config. Commit it.
   - `provenance/regions/<name>.json`: the record of every Landsat scene used, with its URLs, ETags and sizes, plus the timings and a digest of the tiles. Commit it.
-  - `public/tiles/landsat/<name>/`: the tiles. Gitignored, and rebuildable from the config.
+  - `public/tiles/landsat/<name>/`: the tiles, with the region's terrain in `terrain/`. Gitignored, and rebuildable from the config.
+- **Its terrain** takes over from the global terrain inside the region while the region is switched on. The readout then names it: `USGS 3DEP · ≈10 m detail` (Mount Lamlam, Guam's summit, reads 401 m against 334 m on the global terrain, whose 600 m averages flatten it; the real height is about 406 m).
 
 ### Managing regions
 
@@ -173,6 +176,8 @@ The panel and its API exist only in the dev server. `npm run build` leaves both 
 ### How it works
 
 Scenes come from Landsat Collection 2 Level-2 (surface reflectance), through Microsoft Planetary Computer's public catalogue. Only the region's pixels are read from the cloud-optimised files. Clouds and shadows are masked using Landsat's own quality band, and each pixel is the median of the clear views. Tiles are WebP, so areas with no clear view, or outside a polygon, stay transparent and Blue Marble shows through. Completely empty tiles aren't written; each build's `tiles.json` lists the ones that exist, so the globe never requests a missing tile. USGS Landsat imagery is public domain (see [LICENSING.md](LICENSING.md)), and the globe credits USGS on screen.
+
+Terrain: `scripts/region_terrain.py`. It searches 3DEP and NASADEM, then reads the region's pixels once onto the grid of its deepest zoom, 3DEP first and NASADEM only for gaps. Elevation tiles use the same encoding as the global terrain, except that the blue channel holds the region's share of each height (255 inside, fading to 0 at the edge), which the readout uses. The record lists every elevation file used.
 
 `npm run test:build` builds a small area near Boulder through the panel, end to end. It uses the internet and takes about a minute. `npm run screenshots -- --regions-only` retakes the screenshots above by building a demo region and then deleting it.
 
@@ -228,6 +233,7 @@ The full guide is [docs/map-server.md](docs/map-server.md), also in the app's Gu
 | `/catalog.json` | Every layer: id, kind, URLs, zoom range, bounds, attribution, licence, provenance |
 | `/tiles/<layer>/tilejson.json` | [TileJSON 3.0.0](https://github.com/mapbox/tilejson-spec): all a web map needs, including the attribution |
 | `/tiles/<layer>/{z}/{x}/{y}.<ext>` | Web Mercator XYZ tiles, 256 px. Tiles a layer deliberately lacks (ocean in Grey, outside a region) answer **204** (blank), not 404. |
+| `/tiles/terrain/…`, `/tiles/landsat/<region>/terrain/…` | Elevation tiles (Terrarium encoding): the global terrain and each region's. MapLibre shows them as 3D terrain and hillshading. |
 | `/vectors/<name>.geojson` | The vector layers, as-is |
 | `/provenance/`, `/licensing`, `/notice` | The build records, LICENSING.md and NOTICE |
 

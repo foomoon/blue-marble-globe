@@ -14,21 +14,15 @@ Today's build reads every scene before compositing, keeps all of it on disk, and
 - Run chunks in parallel, using all CPU cores.
 - Globe progress: show chunks filling in across the region.
 
-### Regional terrain (USGS 3DEP, NASADEM elsewhere)
-
-Detailed terrain for a region, built alongside its Landsat imagery: a "terrain too" option in the Regions panel.
-
-- **Source:** USGS 3DEP Seamless at 10 m (`3dep-seamless` on Planetary Computer, PDDL; covers the US including Alaska, Hawaii and territories such as Guam). Outside it, NASADEM at 30 m (60°N to 56°S). 3DEP lidar at 2 m exists in many areas, if ever needed.
-- **Same pipeline as the Landsat build:** windowed reads of only the region's pixels, polygon masks, progress, provenance. The prototype read the 1,200 km² Grand Canyon area at zoom 9–14 in 82 s: 501 tiles, 9.8 MB.
-- **Blend into the global terrain at the edge.** The prototype showed a visible step where 10 m 3DEP meets 450 m ETOPO. Feather the last few hundred metres, or pad the terrain region beyond the imagery.
-- `src/terrain.js` takes one source today; regions need it to try the region's tiles first, then the global set.
-- Archive USGS's terms (also needed for Landsat; see Housekeeping).
-
-### Terrain in the map server
-
-Serve `public/tiles/terrain/` with TileJSON (`"encoding": "terrarium"`), so MapLibre can show it as `raster-dem` (3D terrain and hillshading). The catalog and index page need a third kind next to raster and vector.
-
 ## Ideas
+
+### Regional terrain for big regions
+
+`scripts/region_terrain.py` reads a region's elevation onto its zoom-14 grid in one scratch file (capped at 600 million pixels; bigger regions stop a zoom earlier). Fine for parks and cities; a state-sized region would want the same chunking as the imagery build.
+
+### Terrain at the edge of regional tiles in Cesium
+
+In Cesium, a terrain tile partly covered by a region's tiles takes neighbouring heights from the nearest pixel it has, which is fine because the region has blended into the global heights by its edge. Thin lines are sometimes visible along terrain tile seams on steep slopes; probably Cesium's skirts. Worth a look if it bothers anyone.
 
 ### Heights relative to the ellipsoid (geoid correction)
 
@@ -74,6 +68,4 @@ Rename to "Scenes per area" and add a tooltip explaining Landsat path/rows and w
 
 ## Housekeeping
 
-- **Archive USGS's Landsat terms** in `provenance/terms/` (like NASA's, via `scripts/fetch_terms.py`). `LICENSING.md` section 1b currently states them from memory.
-- **Rebuild Guam** so it gets a `tiles.json`. Harmless as is: all its tiles exist.
 - **Homebrew numpy is broken** on the dev Mac (missing `__init__.py`); the project uses `.venv` to avoid it. `brew reinstall numpy` would fix it system-wide.

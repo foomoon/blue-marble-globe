@@ -294,28 +294,72 @@ export function mountLayers(viewer, baseLayer) {
   }
 
   // ---- terrain ----
+  // The global terrain, plus each switched-on region's own terrain on top of it (regions first:
+  // at each point the first source with data wins). Rebuilt whenever that set changes.
   let terrainBuilt; // true / false (not built) / undefined (checking)
-  let terrain = null; // the provider, once loaded
+  let terrain = null; // the provider, for the current set of sources
   let heights = null; // its height source
-  let relief = null; // relief shading layer (Grey and None), made on first use
+  let terrainKey = null; // which sources it was built from
+  let globalSource = null; // loaded once
+  let relief = null; // relief shading layer (Grey and None), made on demand
   const flat = new Cesium.EllipsoidTerrainProvider();
   const exaggeration = () => prefs.terrain?.exaggeration ?? TERRAIN.exaggeration;
 
-  async function setTerrain() {
+  async function loadIndex(url) {
+    const { zoom, tiles } = await (await fetch(url)).json();
+    const available = new Set();
+    for (const [z, xs] of Object.entries(tiles)) for (const [x, ys] of Object.entries(xs)) for (const y of ys) available.add(`${z}/${x}/${y}`);
+    return { zoom, available };
+  }
+
+  // Region terrain sources, each loaded once per build
+  const regionTerrain = new Map(); // name -> Promise<source | null>
+  function regionSource(r) {
+    const key = `${r.name}@${r.built_utc}`;
+    if (!regionTerrain.has(key)) {
+      regionTerrain.set(key, loadIndex(r.terrain.tiles_index).then(
+        ({ zoom, available }) => ({
+          name: r.name, label: r.terrain.source, url: `${r.terrain.url}?b=${encodeURIComponent(r.built_utc)}`, available,
+          minzoom: zoom[0], maxzoom: zoom[1], detail: r.terrain.detail_m, shareInBlue: true, credit: r.terrain.credit,
+        }),
+        () => null,
+      ));
+    }
+    return regionTerrain.get(key);
+  }
+
+  let terrainQueue = Promise.resolve();
+  const setTerrain = () => (terrainQueue = terrainQueue.then(applyTerrain, applyTerrain)); // one at a time, in order
+
+  async function applyTerrain() {
     const on = terrainBuilt && isOn("terrain");
-    if (on && !terrain) {
+    if (on) {
       try {
-        const res = await fetch(TERRAIN.index);
-        const { zoom, tiles } = await res.json();
-        const available = new Set();
-        for (const [z, xs] of Object.entries(tiles)) for (const [x, ys] of Object.entries(xs)) for (const y of ys) available.add(`${z}/${x}/${y}`);
-        heights = heightSource({ url: TERRAIN.url, available, maxzoom: zoom[1] });
-        terrain = terrainProvider(heights, { credit: TERRAIN.credit });
+        if (!globalSource) {
+          const { zoom, available } = await loadIndex(TERRAIN.index);
+          globalSource = { name: "global", label: TERRAIN.source, url: TERRAIN.url, available, minzoom: 0,
+                           maxzoom: zoom[1], detail: 463, shareInBlue: false };
+        }
       } catch (err) {
         console.warn("Couldn't load the terrain index:", err);
         terrainBuilt = false;
         render();
         return;
+      }
+      const active = [...regions.values()]
+        .filter((e) => e.region.terrain && isOn(e.region.name) && !suspended.has(e.region.name))
+        .sort((a, b) => a.region.name.localeCompare(b.region.name));
+      const sources = (await Promise.all(active.map((e) => regionSource(e.region)))).filter(Boolean);
+      const key = sources.map((src) => src.url).join("|");
+      if (!terrain || key !== terrainKey) {
+        heights = heightSource([...sources, globalSource]);
+        const credits = [TERRAIN.credit.html, ...new Set(sources.map((src) => src.credit.replace(/^Terrain: /, "")))];
+        terrain = terrainProvider(heights, { credit: new Cesium.Credit(credits.join("; "), true) });
+        terrainKey = key;
+        if (relief) {
+          viewer.imageryLayers.remove(relief); // shaded from the old heights
+          relief = null;
+        }
       }
     }
     const want = on ? terrain : flat;
@@ -345,18 +389,26 @@ export function mountLayers(viewer, baseLayer) {
     });
 
   /**
-   * The terrain under a point, for the readout: its source, its height (true metres, not
-   * exaggerated) and how much detail it has there. Null when terrain is off.
+   * The terrain under a point, for the readout: which source serves it, its height (true metres,
+   * not exaggerated) and how much detail it has there. Null when terrain is off.
    */
   async function terrainAt(lon, lat) {
     if (!(terrain && terrainBuilt && isOn("terrain"))) return null;
-    const z = heights.maxzoom, size = 256 * 2 ** z;
     const r = Cesium.Math.toRadians(Math.max(-85.0511, Math.min(85.0511, lat)));
-    const px = ((lon + 180) / 360) * size, py = ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * size;
-    const [h] = await heights.sample(z, [px, py], new Float32Array(1));
-    // Detail: the coarser of the source grid (15", ~463 m north-south) and the tile grid at this latitude
-    const detail = Math.max(463, (2 * Math.PI * 6378137 * Math.cos(r)) / size);
-    return { source: TERRAIN.source, height: h, detail, sea: h < 0.5 };
+    const uv = [(lon + 180) / 360, (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2];
+    const h = new Float32Array(1), share = new Float32Array(1), picked = new Int32Array(1);
+    const src = heights; // the sources at the time of asking
+    await src.sample(30, uv, h, share, picked); // as deep as any source goes
+    // Detail: the coarser of the source's own spacing and its tile grid's at this latitude
+    const detail = (s) => Math.max(s.detail, (2 * Math.PI * 6378137 * Math.cos(r)) / (256 * 2 ** s.maxzoom));
+    const here = src.sources[picked[0]];
+    const global = src.sources[src.sources.length - 1];
+    let label = here.label, spacing = detail(here);
+    if (here.shareInBlue && share[0] < 0.99) {
+      if (share[0] <= 0.01) [label, spacing] = [global.label, detail(global)]; // just past the region's outline
+      else [label, spacing] = [`${here.label} + ${global.label}`, detail(global)]; // the blend at its edge
+    }
+    return { source: label, height: h[0], detail: spacing, sea: h[0] < 0.5 };
   }
 
   function terrainRow() {
@@ -391,8 +443,11 @@ export function mountLayers(viewer, baseLayer) {
   function apply(name) {
     const entry = regions.get(name);
     if (!entry?.layer) return;
-    entry.layer.show = isOn(name) && !suspended.has(name);
+    const shown = isOn(name) && !suspended.has(name);
+    const changed = entry.layer.show !== shown;
+    entry.layer.show = shown;
     entry.layer.alpha = opacity(name);
+    if (changed && entry.region.terrain) setTerrain(); // its terrain goes with it
   }
 
   function render() {
@@ -505,6 +560,7 @@ export function mountLayers(viewer, baseLayer) {
       apply(r.name);
     }
     render();
+    if (terrainBuilt !== undefined) setTerrain(); // a region's terrain may have come, gone or changed
   }
 
   /** Hide a region's layer while it's being rebuilt (the studio shows a live layer instead). */

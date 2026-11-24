@@ -4,6 +4,6 @@
 FROM nginx:1.30.5-alpine
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/mapserver.conf
-COPY cors.conf origin.conf /etc/nginx/
+COPY cors.conf origin.conf sea-level.webp /etc/nginx/
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1

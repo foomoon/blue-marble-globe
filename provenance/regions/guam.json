@@ -37,9 +37,9 @@
       0.3
     ],
     "gamma": 1.6,
-    "updated_utc": "2026-11-22T22:41:30Z"
+    "updated_utc": "2026-11-22T22:47:17Z"
   },
-  "region_config_sha256": "3793c70b9681715e5d05bb7dd880ba7ec8b0cab329d9953d081dd90bb873646d",
+  "region_config_sha256": "39d483d08a08b3234993263a3855c520a5cfd3b40c76cdc8e11ddfdc2d59163d",
   "data": {
     "dataset": "Landsat 8-9 OLI Collection 2 Level-2 surface reflectance",
     "producer": "U.S. Geological Survey (USGS) / NASA",
@@ -684,7 +684,7 @@
     "per pixel: reject QA_PIXEL fill, dilated cloud, cirrus, cloud and cloud shadow",
     "per pixel: median of the remaining scenes, reflectance = DN * 2.75e-5 - 0.2",
     "stretch [0, 0.3] -> 0-1, gamma 1.6, -> 0-255; transparent where no clear view",
-    "gdal2tiles --xyz, WebP quality 85"
+    "gdal2tiles --xyz, WebP quality 85, fully transparent tiles not written; tiles.json lists the rest"
   ],
   "commands": [
     [
@@ -702,7 +702,7 @@
       "public/tiles/landsat/guam"
     ]
   ],
-  "built_utc": "2026-11-22T22:44:50Z",
+  "built_utc": "2026-11-24T01:25:43Z",
   "environment": {
     "gdal": "3.13.3",
     "numpy": "2.5.5",
@@ -710,12 +710,13 @@
     "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O"
   },
   "wall_clock_seconds": {
-    "total": 41.6,
+    "total": 65.4,
     "steps": {
       "search": 1.2,
-      "download": 36.4,
-      "composite": 3.0,
-      "tile": 1.0
+      "download": 39.2,
+      "composite": 2.8,
+      "tile": 1.0,
+      "terrain": 21.0
     }
   },
   "output": {
@@ -724,9 +725,41 @@
       8,
       12
     ],
-    "clear_view_fraction": 0.996,
+    "clear_view_fraction": 1.0,
     "tile_count": 77,
     "bytes": 477100,
     "tiles_sha256": "252ecf5dcdda93a0b17adbad9517cfdd1fd3fe8a2040b1eb0626b554a0e2d22c"
+  },
+  "terrain": {
+    "sources": [
+      {
+        "dataset": "USGS 3DEP",
+        "collection": "3dep-seamless",
+        "licence": "Public domain (USGS)",
+        "items": [
+          {
+            "id": "n14e144-13",
+            "href": "https://ai4edataeuwest.blob.core.windows.net/3dep/Elevation/13/TIFF/n14e144/USGS_13_n14e144.tif"
+          }
+        ]
+      }
+    ],
+    "label": "USGS 3DEP",
+    "credit": "Terrain: U.S. Geological Survey, 3DEP",
+    "detail_m": 10,
+    "zoom": [
+      8,
+      14
+    ],
+    "encoding": "Terrarium, lossless WebP; heights rounded to whole metres, sea at 0; blue = share of the regional source (0-255)",
+    "edges": "blended into the global terrain over 2000 m inside the outline; global heights outside it",
+    "tile_count": 235,
+    "bytes": 2235214,
+    "seconds": {
+      "read": 14.4,
+      "total": 21.0
+    },
+    "tiles_sha256": "ce8e4205bf264ba125e774ab5f1a10e000902f4907a8b3ad280867fed7fe36eb",
+    "path": "public/tiles/landsat/guam/terrain/{z}/{x}/{y}.webp"
   }
 }

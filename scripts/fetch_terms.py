@@ -59,6 +59,24 @@ PAGES = [
         "why": "Product page for the terrain source: versions, downloads and the citation",
         "container_id": "block-ncei-content",
     },
+    {
+        "name": "usgs-copyrights-and-credits",
+        "title": "USGS: Copyrights and Credits",
+        "url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+        "why": "USGS data is public domain: covers Landsat imagery and 3DEP regional terrain; the requested credit",
+    },
+    {
+        "name": "nasa-earthdata-data-use-guidance",
+        "title": "NASA Earthdata: Data Use and Citation Guidance",
+        "url": "https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance",
+        "why": "NASA mission data is CC0 with no restrictions: covers NASADEM regional terrain",
+    },
+    {
+        "name": "nasadem",
+        "title": "NASA Earthdata: NASADEM Merged DEM Global 1 arc second V001",
+        "url": "https://www.earthdata.nasa.gov/data/catalog/lpcloud-nasadem-hgt-001",
+        "why": "Dataset page for NASADEM: 'openly shared, without restriction', and its citation",
+    },
 ]
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -133,6 +133,8 @@ viewer.scene.verticalExaggeration = 2; // relief is tiny at globe scale; 1 is tr
 
 Switch it off with `viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()` (a smooth Earth).
 
+**Several sources.** `heightSource` takes a list in priority order. `src/layers.js` puts each switched-on region's terrain first and the global terrain last, so at each point the first source with a tile wins. Region tiles keep, in their blue channel, the region's share of each height (it fades to 0 at the region's edge, where its heights blend into the global ones), and `sample()` can return it: that's how the readout knows which source is under the cursor.
+
 Things that matter here:
 
 - **Decode the colours exactly.** Pass `{ colorSpaceConversion: "none", premultiplyAlpha: "none" }` to `createImageBitmap`. The browser otherwise colour-manages the image, and every height shifts. The tiles are lossless WebP for the same reason: lossy compression would change the heights.

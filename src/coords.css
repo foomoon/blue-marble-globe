@@ -15,8 +15,18 @@
   backdrop-filter: blur(6px);
 }
 
+/* The reference the coordinates are on: dimmer than the numbers */
+.coords-datum {
+  color: #9aa4b2;
+  pointer-events: auto; /* its explanation shows on hover */
+}
+.coords-alt {
+  pointer-events: auto;
+}
+
 /* The terrain under the point: smaller and dimmer than the position under it */
 .coords-terrain {
+  pointer-events: auto; /* its explanation shows on hover */
   color: #9aa4b2;
   font-size: 11px;
   text-align: right;

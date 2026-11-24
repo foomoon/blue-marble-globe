@@ -232,6 +232,36 @@ test("terrain: tiles decode to real heights; toggle and exaggeration are remembe
   await expect(page.locator(".coords-alt")).toHaveText(""); // and no altitude
 });
 
+test("terrain heights are above sea level, and regional terrain agrees with the global terrain", async ({ page }) => {
+  test.skip(!existsSync("public/tiles/terrain/tiles.json"), "terrain not built (npm run build:terrain)");
+  await page.goto("/");
+  // Height at a point, decoded from a tile the way src/terrain.js does (nearest pixel)
+  const heightAt = (root, z, lon, lat, shareInBlue) =>
+    page.evaluate(async ({ root, z, lon, lat, shareInBlue }) => {
+      const k = 2 ** z, r = (lat * Math.PI) / 180;
+      const fx = ((lon + 180) / 360) * k, fy = ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * k;
+      const res = await fetch(`${root}/${z}/${Math.floor(fx)}/${Math.floor(fy)}.webp`);
+      if (!res.ok) return null;
+      const bmp = await createImageBitmap(await res.blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+      const ctx = new OffscreenCanvas(256, 256).getContext("2d");
+      ctx.drawImage(bmp, 0, 0);
+      const [R, G, B] = ctx.getImageData(Math.floor((fx % 1) * 256), Math.floor((fy % 1) * 256), 1, 1).data;
+      return R * 256 + G + (shareInBlue ? 0 : B / 256) - 32768;
+    }, { root, z, lon, lat, shareInBlue });
+  // Guam International Airport: ~80 m in both ETOPO and 3DEP. Guam is where it shows most: the geoid
+  // is ~55 m above the ellipsoid there, so heights converted to the ellipsoid would read ~135 m.
+  const global = await heightAt("/tiles/terrain", 8, 144.796, 13.4834, false);
+  expect(global, "global terrain at Guam's airport").toBeGreaterThan(60);
+  expect(global).toBeLessThan(100);
+  if (existsSync("public/tiles/landsat/guam/terrain/tiles.json")) {
+    for (const [lon, lat] of [[144.796, 13.4834], [144.93, 13.584], [144.84, 13.52]]) {
+      const regional = await heightAt("/tiles/landsat/guam/terrain", 14, lon, lat, true);
+      const g = await heightAt("/tiles/terrain", 8, lon, lat, false);
+      expect(Math.abs(regional - g), `3DEP ${regional} m vs ETOPO ${g} m at ${lon}, ${lat}`).toBeLessThan(15);
+    }
+  }
+});
+
 test("base map None: no base imagery is requested, overlays still load", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Layers" }).click();
@@ -268,9 +298,10 @@ test("lat/lon/alt readout follows the cursor and falls back to the view centre; 
   const readout = page.locator(".coords > div").last(); // the position line
   const terrainBuilt = existsSync("public/tiles/terrain/tiles.json");
   // lat, lon, and with terrain (on by default) the altitude there
+  // Labelled with what they're measured against: WGS84 (the ellipsoid) and MSL (mean sea level)
   const pattern = terrainBuilt
-    ? /^\d+\.\d{4}° [NS] {2}\d+\.\d{4}° [EW] +[\d,]+ m$/
-    : /^\d+\.\d{4}° [NS] {2}\d+\.\d{4}° [EW]$/;
+    ? /^WGS84 {2}\d+\.\d{4}° [NS] {2}\d+\.\d{4}° [EW] +[\d,]+ m MSL$/
+    : /^WGS84 {2}\d+\.\d{4}° [NS] {2}\d+\.\d{4}° [EW]$/;
   // On load: the centre of the view
   await expect(readout).toHaveText(pattern);
   await expect(readout).toHaveAttribute("title", "Centre of the view");
@@ -280,6 +311,8 @@ test("lat/lon/alt readout follows the cursor and falls back to the view centre; 
   await expect(readout).toHaveAttribute("title", "Under the cursor");
   await expect(readout).toHaveText(pattern);
   await expect(readout).not.toHaveText(centre);
+  await expect(page.locator(".coords-datum")).toHaveAttribute("title", /WGS84 ellipsoid/);
+  await expect(page.locator(".coords-alt")).toHaveAttribute("title", /mean sea level/);
   // With terrain: where the altitude comes from and its detail, on the line above
   if (terrainBuilt) {
     await expect(page.locator(".coords-terrain")).toHaveText(/^NOAA ETOPO 2022 · (sea level|≈[\d,]+ m detail)$/);

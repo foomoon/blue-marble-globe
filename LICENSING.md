@@ -63,13 +63,21 @@ Only geometric processing, recorded command by command in [`provenance/build.jso
 
 There is **no colour correction, no compositing with any other dataset, and no labels**. The tiles contain NASA's pixels and nothing else, so no third-party rights come in with them.
 
-## 1b. Regional layers: Landsat 8/9 (optional)
+## 1b. Regional layers: Landsat 8/9 imagery and regional terrain (optional)
 
-Regions built in the dev studio use **Landsat 8–9 Collection 2 Level-2** imagery from the **U.S. Geological Survey**. Landsat data is a US government work, distributed by USGS without copyright restrictions. USGS asks for a credit line, which the app shows on screen whenever a Landsat layer is present: "Landsat imagery courtesy of the U.S. Geological Survey".
+Regions built in the dev studio use **Landsat 8–9 Collection 2 Level-2** imagery and, for their terrain, **USGS 3DEP** (10 m, the United States and its territories) or, outside it, **NASADEM** (30 m). All are read through Microsoft Planetary Computer's public catalogue. That service has its own terms of use for access, but they don't change the data's status. Each build records exactly which Landsat scenes and which elevation files it used in `provenance/regions/<name>.json`.
 
-The scenes are *read* through Microsoft Planetary Computer's public catalogue. That service has its own terms of use for access, but they don't change the data's status. Each build records exactly which scenes it used in `provenance/regions/<name>.json`.
+**Landsat and 3DEP: public domain.** From USGS's copyrights page ([archived copy](provenance/terms/usgs-copyrights-and-credits.md)):
 
-> USGS's terms aren't archived in `provenance/terms/` yet, unlike NASA's. Do that before relying on this section, in the same way (`scripts/fetch_terms.py`).
+> USGS-authored or produced data and information are considered to be in the U.S. Public Domain.
+
+The same page asks for credit, and the app gives it on screen: "Landsat imagery courtesy of the U.S. Geological Survey" whenever a Landsat layer is present, and "U.S. Geological Survey, 3DEP" in the terrain credit while a region with 3DEP terrain is on.
+
+**NASADEM: no restrictions.** NASA's dataset page ([archived copy](provenance/terms/nasadem.md)) says it is "openly shared, without restriction", under NASA's data use guidance ([archived copy](provenance/terms/nasa-earthdata-data-use-guidance.md)):
+
+> Unless the content is marked with a use restriction or license, data provided from a NASA-led mission are licensed as Creative Commons Zero (CC0).
+
+NASA asks for a citation; the app credits "NASA JPL, NASADEM" while such a region is on. A region's terrain uses NASADEM only where 3DEP has no data, and only if it adds a meaningful share of the land (at least 0.5%), so the credit reflects what's actually there.
 
 ## 1c. Grey base map, borders, states and coastlines: Natural Earth
 

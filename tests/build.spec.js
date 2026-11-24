@@ -61,12 +61,17 @@ test("build a region from the panel with live progress", async ({ page, request 
 
   await expect(card.locator(".job-state")).toHaveText("✓ done");
   await expect(card.locator(".job-message")).toContainText("tiles");
-  for (const stage of ["Search", "Download", "Composite", "Tile"]) {
-    await expect(card.locator(".job-stages li", { hasText: stage })).toHaveAttribute("data-status", "done");
+  // By exact stage name: "Tile" would also match the Terrain row's "89 tiles"
+  const stageRow = (name) => card.locator(".job-stages li").filter({ has: page.locator(".name", { hasText: new RegExp(`^${name}$`) }) });
+  for (const stage of ["Search", "Download", "Composite", "Tile", "Terrain"]) {
+    await expect(stageRow(stage)).toHaveAttribute("data-status", "done");
   }
   expect(existsSync(`provenance/regions/${NAME}.json`)).toBe(true);
   expect(existsSync(`public/tiles/landsat/${NAME}/12`)).toBe(true);
   expect(existsSync(`public/tiles/landsat/${NAME}/tiles.json`)).toBe(true);
+  // Boulder is in the US: 10 m terrain from USGS 3DEP
+  await expect(stageRow("Terrain")).toContainText("USGS 3DEP, 10 m");
+  expect(existsSync(`public/tiles/landsat/${NAME}/terrain/tiles.json`)).toBe(true);
   await expect(item).toContainText("built");
 
   // The finished layer on the globe

@@ -1,5 +1,5 @@
 // The dev-only Regions studio: draw a rectangle, see the estimate, save the config.
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 const NAME = "playwright-test";
@@ -120,4 +120,19 @@ test("switching a built region off in Layers really hides its layer", async ({ p
 test("studio API refuses other origins", async ({ request }) => {
   const res = await request.delete(`/api/regions/${NAME}`, { headers: { Origin: "https://example.com" } });
   expect(res.status()).toBe(403);
+});
+
+test("tiles written after the dev server started are served (a region just built)", async ({ request }) => {
+  // The dev server doesn't watch public/tiles (too many files); vite.config.js serves them from disk
+  const dir = "public/tiles/landsat/_new-tile-probe/9/1/2.webp";
+  mkdirSync("public/tiles/landsat/_new-tile-probe/9/1", { recursive: true });
+  try {
+    copyFileSync("mapserver/sea-level.webp", dir);
+    const res = await request.get(`/tiles/landsat/_new-tile-probe/9/1/2.webp?b=x`);
+    expect(res.status()).toBe(200);
+    expect(res.headers()["content-type"]).toBe("image/webp");
+    expect((await request.get("/tiles/landsat/_new-tile-probe/9/1/3.webp")).status()).toBe(404);
+  } finally {
+    rmSync("public/tiles/landsat/_new-tile-probe", { recursive: true, force: true });
+  }
 });

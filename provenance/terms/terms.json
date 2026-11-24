@@ -59,6 +59,42 @@
       "raw_file": "raw/noaa-etopo-2022.html",
       "raw_sha256": "db95cbdc2619b5cc01f78fe27f24b0ed8ae4ec0d786492941dc06a50b7b7f875",
       "text_file": "noaa-etopo-2022.md"
+    },
+    {
+      "name": "usgs-copyrights-and-credits",
+      "title": "USGS: Copyrights and Credits",
+      "why": "USGS data is public domain: covers Landsat imagery and 3DEP regional terrain; the requested credit",
+      "url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "final_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "retrieved_utc": "2026-11-24T00:25:44Z",
+      "http_last_modified": "Tue, 24 Nov 2026 00:20:57 GMT",
+      "raw_file": "raw/usgs-copyrights-and-credits.html",
+      "raw_sha256": "053bfd2aa983ed8bb6e8ff8c5606d6b8a19cae6b124163d006b3133a227deba8",
+      "text_file": "usgs-copyrights-and-credits.md"
+    },
+    {
+      "name": "nasa-earthdata-data-use-guidance",
+      "title": "NASA Earthdata: Data Use and Citation Guidance",
+      "why": "NASA mission data is CC0 with no restrictions: covers NASADEM regional terrain",
+      "url": "https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance",
+      "final_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance",
+      "retrieved_utc": "2026-11-24T00:25:44Z",
+      "http_last_modified": "Tue, 24 Nov 2026 00:25:44 GMT",
+      "raw_file": "raw/nasa-earthdata-data-use-guidance.html",
+      "raw_sha256": "eed27b8281ef687e89a9a151a71752d815acb17a6f95c0d746489e12865ffd49",
+      "text_file": "nasa-earthdata-data-use-guidance.md"
+    },
+    {
+      "name": "nasadem",
+      "title": "NASA Earthdata: NASADEM Merged DEM Global 1 arc second V001",
+      "why": "Dataset page for NASADEM: 'openly shared, without restriction', and its citation",
+      "url": "https://www.earthdata.nasa.gov/data/catalog/lpcloud-nasadem-hgt-001",
+      "final_url": "https://www.earthdata.nasa.gov/data/catalog/lpcloud-nasadem-hgt-001",
+      "retrieved_utc": "2026-11-24T00:25:44Z",
+      "http_last_modified": "Tue, 24 Nov 2026 00:25:44 GMT",
+      "raw_file": "raw/nasadem.html",
+      "raw_sha256": "844e03906b34fd945f639cb90ee6a2718e76d580a6f370a286e92e450b9846ea",
+      "text_file": "nasadem.md"
     }
   ]
 }

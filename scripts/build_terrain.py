@@ -172,6 +172,17 @@ def halve(a):
     return (a[0::2, 0::2] + a[1::2, 0::2] + a[0::2, 1::2] + a[1::2, 1::2]) / 4
 
 
+def horizontal(path):
+    """The source's horizontal reference only. ETOPO declares "WGS 84 + EGM2008 height"; given
+    that, GDAL converts the heights to the WGS84 ellipsoid on reprojection, adding the geoid
+    height (+55 m at Guam, -106 to +85 m worldwide). Heights must stay above sea level, as the
+    globe and the regional terrain take them."""
+    from osgeo import gdal
+    srs = gdal.Open(path).GetSpatialRef().Clone()
+    srs.StripVertical()
+    return srs.ExportToWkt()
+
+
 def chunk(args):
     """One zoom-4 square: reproject its heights once at zoom 8, then build zoom 8 down to 4."""
     import numpy as np
@@ -184,8 +195,9 @@ def chunk(args):
     # Where a zoom-8 pixel is bigger than a source pixel (lower latitudes), average; elsewhere interpolate
     lat = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (cy + 0.5) / 2 ** CHUNK_ZOOM))))
     alg = "average" if 611.5 * math.cos(math.radians(lat)) > 463 else "bilinear"
-    ds = gdal.Warp("", vrt, format="MEM", dstSRS="EPSG:3857", outputBounds=bounds, width=n * 256, height=n * 256,
-                   resampleAlg=alg, outputType=gdal.GDT_Float32, srcNodata=NODATA, dstNodata=NODATA)
+    ds = gdal.Warp("", vrt, format="MEM", srcSRS=horizontal(vrt), dstSRS="EPSG:3857", outputBounds=bounds,
+                   width=n * 256, height=n * 256, resampleAlg=alg, outputType=gdal.GDT_Float32,
+                   srcNodata=NODATA, dstNodata=NODATA)
     h = ds.GetRasterBand(1).ReadAsArray()
     h = np.where(h == NODATA, 0, np.maximum(h, 0))  # land only: the sea (and below-sea-level land) at 0
     written, size_bytes = [], 0
@@ -302,9 +314,10 @@ def main() -> None:
         "encoding": {
             "format": "Terrarium: height_m = R * 256 + G + B / 256 - 32768",
             "image": "256 x 256 WebP, lossless",
-            "heights": "metres above mean sea level (ETOPO's EGM2008 geoid), rounded to whole metres. Not corrected "
-                       "to the WGS84 ellipsoid, so they sit on the globe relative to sea level (the difference is "
-                       "up to about 100 m, depending on place).",
+            "heights": "metres above mean sea level (ETOPO's EGM2008 geoid), rounded to whole metres, unchanged: the "
+                       "reprojection uses ETOPO's horizontal reference only, so GDAL doesn't convert them to the "
+                       "WGS84 ellipsoid. They sit on Cesium's ellipsoid relative to sea level (up to about 100 m "
+                       "from true ellipsoid heights, depending on place).",
             "sea": "Heights below 0 are set to 0, including land below sea level (e.g. the Dead Sea shore, Death "
                    "Valley). Tiles with no height above 0 aren't written; tiles.json lists those that are.",
             "resampling": f"Reprojected once to the zoom-{MAX_ZOOM} Web Mercator grid ('average' where a grid cell is "

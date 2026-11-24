@@ -141,6 +141,19 @@
   background: rgba(0, 0, 0, 0.3);
   color-scheme: dark;
 }
+.studio-form label.studio-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--guide-fg);
+  cursor: pointer;
+}
+.studio-form .studio-check input {
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  accent-color: var(--guide-accent);
+}
 .studio-form input:invalid {
   border-color: #ff8a7c;
 }
@@ -346,6 +359,13 @@
 }
 .job-stages li[data-status="done"] .ico {
   color: #7cffb2;
+}
+.job-stages li[data-status="failed"] .ico {
+  color: #ffb36b;
+}
+.job-stages li[data-status="skipped"] .bar i,
+.job-stages li[data-status="failed"] .bar i {
+  background: rgba(255, 255, 255, 0.18);
 }
 .job-stages li[data-status="running"] .ico {
   color: var(--guide-accent);

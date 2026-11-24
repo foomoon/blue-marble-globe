@@ -14,23 +14,26 @@ const CACHE = 300; // decoded files kept (256 KB each)
 const MAX_LAT = Cesium.Math.toRadians(85.0511287798);
 
 /**
- * Reads heights from the tiles: one shared decoder, used by the terrain and the relief shading.
- * @param {object} options
- * @param {string} options.url             tile URL template, e.g. "/tiles/terrain/{z}/{x}/{y}.webp"
- * @param {Set<string>} options.available  "z/x/y" of every tile that exists (from tiles.json)
- * @param {number} options.maxzoom         the deepest zoom built
+ * Reads heights from one or more tile sets: one shared decoder and cache, used by the terrain,
+ * the relief shading and the readout. Sources are in priority order (regions first, the global
+ * terrain last): at each point, the first source with a tile there wins.
+ *
+ * Each source: { name, label, url, available (Set of "z/x/y"), minzoom, maxzoom, detail (its
+ * native spacing, m), shareInBlue }. Region tiles (shareInBlue) keep in their blue channel the
+ * share of the regional data in each height (0-255; it blends into the global terrain at the
+ * region's edge); in global tiles blue is Terrarium's 1/256 m.
  */
-export function heightSource({ url, available, maxzoom }) {
-  const cache = new Map(); // "z/x/y" -> Promise<Float32Array | null>, least recently used first
+export function heightSource(sources) {
+  const cache = new Map(); // "source/z/x/y" -> Promise<{h, share} | null>, least recently used first
 
-  /** Heights of one file, or null where the build wrote none (sea). */
-  function file(z, x, y) {
-    const key = `${z}/${x}/${y}`;
-    if (!available.has(key)) return Promise.resolve(null);
+  function file(si, z, x, y) {
+    const src = sources[si];
+    if (!src.available.has(`${z}/${x}/${y}`)) return null;
+    const key = `${si}/${z}/${x}/${y}`;
     let p = cache.get(key);
     if (p) cache.delete(key);
     else {
-      p = decode(url.replace("{z}", z).replace("{x}", x).replace("{y}", y));
+      p = decode(src.url.replace("{z}", z).replace("{x}", x).replace("{y}", y), src.shareInBlue);
       p.catch(() => cache.delete(key)); // a failed request can be tried again
     }
     cache.set(key, p);
@@ -38,39 +41,81 @@ export function heightSource({ url, available, maxzoom }) {
     return p;
   }
 
+  /** Which source and zoom serve a point (u, v: Web Mercator, 0-1) at a given level. */
+  function pick(level, u, v) {
+    for (let si = 0; si < sources.length; si++) {
+      const src = sources[si];
+      const z = Math.min(level, src.maxzoom);
+      if (z < src.minzoom) continue;
+      const n = 2 ** z;
+      const fx = Math.min(n - 1, Math.floor(u * n)), fy = Math.min(n - 1, Math.max(0, Math.floor(v * n)));
+      if (si === sources.length - 1 || src.available.has(`${z}/${fx}/${fy}`)) return [si, z];
+    }
+  }
+
   /**
-   * Heights at many points on the zoom-z pixel grid (pixel centres at +0.5): loads the files they
-   * fall in, then interpolates between the four nearest pixels. `points` is [x0, y0, x1, y1, ...].
+   * Heights at many points: `uv` is [u0, v0, u1, v1, ...] in Web Mercator (0-1). Interpolates
+   * between the four nearest pixels (values sit at pixel centres) of the source picked for each
+   * point. With `share`, also fills in each point's regional share (0 where the global terrain
+   * serves it) and `picked`, the source index per point.
    */
-  async function sample(z, points, out) {
-    const size = 256 * 2 ** z;
+  async function sample(level, uv, out, share, picked) {
+    const count = uv.length / 2;
+    const choice = new Array(count);
     const files = new Map();
-    for (let i = 0; i < points.length; i += 2) {
-      const px = Math.floor(points[i] - 0.5), py = Math.floor(points[i + 1] - 0.5);
-      for (const gx of [px, px + 1]) for (const gy of [py, py + 1]) {
-        const fx = (((gx % size) + size) % size) >> 8, fy = Math.min(size - 1, Math.max(0, gy)) >> 8;
-        const key = `${fx}/${fy}`;
-        if (!files.has(key)) files.set(key, file(z, fx, fy));
-      }
+    const need = (si, z, gx, gy) => {
+      const size = 256 * 2 ** z;
+      gx = ((gx % size) + size) % size;
+      gy = Math.min(size - 1, Math.max(0, gy));
+      const key = `${si}/${z}/${gx >> 8}/${gy >> 8}`;
+      if (!files.has(key)) files.set(key, file(si, z, gx >> 8, gy >> 8));
+    };
+    for (let i = 0; i < count; i++) {
+      const [si, z] = pick(level, uv[2 * i], uv[2 * i + 1]);
+      choice[i] = [si, z];
+      const size = 256 * 2 ** z;
+      const px = Math.floor(uv[2 * i] * size - 0.5), py = Math.floor(uv[2 * i + 1] * size - 0.5);
+      need(si, z, px, py); need(si, z, px + 1, py); need(si, z, px, py + 1); need(si, z, px + 1, py + 1);
     }
     const loaded = new Map();
-    await Promise.all([...files].map(async ([k, p]) => loaded.set(k, await p)));
-    const at = (gx, gy) => {
-      gx = ((gx % size) + size) % size; // wraps at the antimeridian
-      gy = Math.min(size - 1, Math.max(0, gy));
-      const h = loaded.get(`${gx >> 8}/${gy >> 8}`);
-      return h ? h[(gy & 255) * 256 + (gx & 255)] : 0;
-    };
-    for (let i = 0, o = 0; i < points.length; i += 2, o++) {
-      const x = points[i] - 0.5, y = points[i + 1] - 0.5;
+    await Promise.all([...files].map(async ([k, p]) => loaded.set(k, p ? await p : null)));
+    for (let i = 0; i < count; i++) {
+      const [si, z] = choice[i];
+      const size = 256 * 2 ** z;
+      const x = uv[2 * i] * size - 0.5, y = uv[2 * i + 1] * size - 0.5;
       const x0 = Math.floor(x), y0 = Math.floor(y), wx = x - x0, wy = y - y0;
-      out[o] = (at(x0, y0) * (1 - wx) + at(x0 + 1, y0) * wx) * (1 - wy) + (at(x0, y0 + 1) * (1 - wx) + at(x0 + 1, y0 + 1) * wx) * wy;
+      // A neighbour in a file this source doesn't have (the edge of a region's tiles) takes the
+      // point's own pixel: by then the region has blended into the global heights anyway
+      const own = cell(loaded, si, z, size, Math.round(x), Math.round(y));
+      const at = (gx, gy, field) => cell(loaded, si, z, size, gx, gy)?.[field] ?? own?.[field] ?? 0;
+      const lerp = (field) =>
+        (at(x0, y0, field) * (1 - wx) + at(x0 + 1, y0, field) * wx) * (1 - wy) +
+        (at(x0, y0 + 1, field) * (1 - wx) + at(x0 + 1, y0 + 1, field) * wx) * wy;
+      out[i] = lerp("h");
+      if (share) share[i] = sources[si].shareInBlue ? lerp("share") : 0;
+      if (picked) picked[i] = si;
     }
     return out;
   }
 
-  return { maxzoom, file, sample };
+  return { sources, sample, pick };
 }
+
+/** One pixel of a loaded file: { h, share } or undefined where the file doesn't exist. */
+function cell(loaded, si, z, size, gx, gy) {
+  gx = ((gx % size) + size) % size; // wraps at the antimeridian
+  gy = Math.min(size - 1, Math.max(0, gy));
+  const f = loaded.get(`${si}/${z}/${gx >> 8}/${gy >> 8}`);
+  if (!f) return undefined;
+  const i = (gy & 255) * 256 + (gx & 255);
+  return { h: f.h[i], share: f.share ? f.share[i] / 255 : 0 };
+}
+
+/** Web Mercator v (0 at the top, 1 at the bottom) of a latitude in radians, clamped to the grid. */
+const mercV = (lat) => {
+  const l = Math.max(-MAX_LAT, Math.min(MAX_LAT, lat));
+  return (1 - Math.log(Math.tan(l) + 1 / Math.cos(l)) / Math.PI) / 2;
+};
 
 /** Cesium terrain from a heightSource. */
 export function terrainProvider(source, { credit } = {}) {
@@ -82,20 +127,16 @@ export function terrainProvider(source, { credit } = {}) {
     credit,
     callback: (x, y, level) => {
       const r = tilingScheme.tileXYToRectangle(x, y, level);
-      // A geographic tile at level L has about the detail of a Web Mercator tile at zoom L
-      const z = Math.min(level, source.maxzoom);
-      const size = 256 * 2 ** z;
-      const points = new Float64Array(N * N * 2);
+      const uv = new Float64Array(N * N * 2);
       for (let j = 0; j < N; j++) {
-        const lat = Math.max(-MAX_LAT, Math.min(MAX_LAT, r.north - (j / (N - 1)) * (r.north - r.south)));
-        const py = ((1 - Math.log(Math.tan(lat) + 1 / Math.cos(lat)) / Math.PI) / 2) * size;
+        const v = mercV(r.north - (j / (N - 1)) * (r.north - r.south));
         for (let i = 0; i < N; i++) {
-          const lon = r.west + (i / (N - 1)) * (r.east - r.west);
-          points[(j * N + i) * 2] = ((lon + Math.PI) / (2 * Math.PI)) * size;
-          points[(j * N + i) * 2 + 1] = py;
+          uv[(j * N + i) * 2] = (r.west + (i / (N - 1)) * (r.east - r.west) + Math.PI) / (2 * Math.PI);
+          uv[(j * N + i) * 2 + 1] = v;
         }
       }
-      return source.sample(z, points, new Float32Array(N * N));
+      // A geographic tile at level L has about the detail of a Web Mercator tile at zoom L
+      return source.sample(level, uv, new Float32Array(N * N));
     },
   });
 }
@@ -116,16 +157,20 @@ export function reliefProvider(source, { strength = 2 } = {}) {
   const az = Cesium.Math.toRadians(315), zen = Cesium.Math.toRadians(45);
   const flat = Math.cos(zen);
   provider.requestImage = async (x, y, level) => {
-    const z = Math.min(level, source.maxzoom);
-    const k = 2 ** (level - z); // tile pixels per file pixel
-    // 258 x 258 heights: the tile plus a 1-pixel border, for the slopes at its edges
-    const W = 258;
-    const points = new Float64Array(W * W * 2);
+    // Slopes are measured across one pixel of the source's own files (k tile pixels): deeper
+    // than the files go, heights are interpolated flat between file pixels, and slopes measured
+    // across one tile pixel would show those flat facets as squares
+    const size = 256 * 2 ** level;
+    const [, zf] = source.pick(level, (x + 0.5) / 2 ** level, (y + 0.5) / 2 ** level);
+    const k = Math.min(16, 2 ** (level - zf));
+    // The tile plus a k-pixel border, for the slopes at its edges
+    const W = 256 + 2 * k;
+    const uv = new Float64Array(W * W * 2);
     for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) {
-      points[(j * W + i) * 2] = (x * 256 + i - 1 + 0.5) / k;
-      points[(j * W + i) * 2 + 1] = (y * 256 + j - 1 + 0.5) / k;
+      uv[(j * W + i) * 2] = (x * 256 + i - k + 0.5) / size;
+      uv[(j * W + i) * 2 + 1] = (y * 256 + j - k + 0.5) / size;
     }
-    const h = await source.sample(z, points, new Float32Array(W * W));
+    const h = await source.sample(level, uv, new Float32Array(W * W));
     if (!h.some((v) => v > 0)) return empty;
     // Ground size of one tile pixel at this tile's latitude
     const lat = Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 0.5)) / 2 ** level)));
@@ -135,9 +180,9 @@ export function reliefProvider(source, { strength = 2 } = {}) {
     const img = ctx.createImageData(256, 256);
     for (let j = 0; j < 256; j++) {
       for (let i = 0; i < 256; i++) {
-        const c = (j + 1) * W + (i + 1);
-        const dzdx = ((h[c + 1] - h[c - 1]) * strength) / (2 * cell);
-        const dzdy = ((h[c + W] - h[c - W]) * strength) / (2 * cell); // +y is south
+        const c = (j + k) * W + (i + k);
+        const dzdx = ((h[c + k] - h[c - k]) * strength) / (2 * k * cell);
+        const dzdy = ((h[c + k * W] - h[c - k * W]) * strength) / (2 * k * cell); // +y is south
         const slope = Math.atan(Math.hypot(dzdx, dzdy));
         const aspect = Math.atan2(dzdy, -dzdx);
         const shade = Math.cos(zen) * Math.cos(slope) + Math.sin(zen) * Math.sin(slope) * Math.cos(az - Math.PI / 2 - aspect);
@@ -154,7 +199,7 @@ export function reliefProvider(source, { strength = 2 } = {}) {
   return provider;
 }
 
-async function decode(href) {
+async function decode(href, shareInBlue) {
   const res = await fetch(href);
   if (!res.ok) throw new Error(`${res.status} ${href}`);
   // The colours are data, not a picture: no colour management, no premultiplied alpha
@@ -164,6 +209,13 @@ async function decode(href) {
   bitmap.close();
   const rgba = ctx.getImageData(0, 0, 256, 256).data;
   const h = new Float32Array(256 * 256);
-  for (let i = 0; i < h.length; i++) h[i] = rgba[i * 4] * 256 + rgba[i * 4 + 1] + rgba[i * 4 + 2] / 256 - 32768;
-  return h;
+  const share = shareInBlue ? new Uint8Array(256 * 256) : null;
+  for (let i = 0; i < h.length; i++) {
+    const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
+    if (share) {
+      h[i] = r * 256 + g - 32768; // whole metres; blue is the regional share
+      share[i] = b;
+    } else h[i] = r * 256 + g + b / 256 - 32768;
+  }
+  return { h, share };
 }

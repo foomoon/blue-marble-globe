@@ -79,6 +79,8 @@ This needs the project's `.venv` (numpy and GDAL's Python bindings; setup is in 
 
 **Heights are relative to sea level** (ETOPO uses the EGM2008 geoid), placed on Cesium's WGS84 ellipsoid without correction. Depending on the place, the difference is up to about 100 m. That's invisible on a globe, but this terrain isn't the thing to measure precise heights against.
 
+The build has to take care to *keep* them relative to sea level. ETOPO's files declare their reference as "WGS 84 + EGM2008 height", and given that, GDAL converts heights to the ellipsoid on reprojection, adding the local geoid height (+55 m at Guam). The build reprojects with the horizontal reference only, so heights pass through unchanged. The regional terrain does the same, so the two agree (a test checks this at Guam).
+
 **Result:** 42,469 tiles, 828 MB (about 880 MB on disk), built in 4 min 14 s using 15 processes on an Apple Silicon Mac, after an 8½-minute download. Only about 40% of zoom-8 tiles have land, which is why it's far smaller than all 87,381.
 
 `provenance/terrain.json` records all 288 files' checksums, the encoding, the method, per-step timings and a digest of every tile.
@@ -101,7 +103,7 @@ npm run fetch:vectors  # -> public/vectors/*.geojson
 
 ## Landsat regions (dev)
 
-Higher-resolution (30 m) regional layers are drawn and built in the **Regions** panel, which only exists under `npm run dev`. The README covers setup and how a build works. Each build records every Landsat scene it used in `provenance/regions/<name>.json`.
+Higher-resolution (30 m) regional layers are drawn and built in the **Regions** panel, which only exists under `npm run dev`. Each also gets its own terrain: USGS 3DEP at 10 m in the US, NASADEM at 30 m elsewhere (`scripts/region_terrain.py`), blended into the global terrain at its edge. The README covers setup and how a build works. Each build records every Landsat scene and elevation file it used in `provenance/regions/<name>.json`.
 
 ## Making your own tileset
 

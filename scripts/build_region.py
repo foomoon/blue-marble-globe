@@ -14,6 +14,8 @@ Stages:
                 and scale surface reflectance to 8-bit with the region's `stretch`
   4. tile       gdal2tiles into public/tiles/landsat/<name>/{z}/{x}/{y}.webp (WebP keeps
                 transparency, so Blue Marble shows wherever there's no Landsat data)
+  5. terrain    (unless the config says "terrain": false) USGS 3DEP 10 m, or NASADEM 30 m where
+                3DEP has none, into public/tiles/landsat/<name>/terrain/: see region_terrain.py
 
 Progress goes to stdout as one JSON object per line, for the Regions panel
 (server/studio.js relays it). Run it in a terminal and you'll see the same lines.
@@ -45,6 +47,8 @@ from pathlib import Path
 
 import numpy as np
 from osgeo import gdal, ogr, osr
+
+import region_terrain
 
 gdal.UseExceptions()
 gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
@@ -389,6 +393,8 @@ def write_index(dest, zoom):
     """tiles.json: which tiles exist, so the globe never requests ones that weren't written."""
     idx = {}
     for p in dest.rglob("*.webp"):
+        if p.relative_to(dest).parts[0] == "terrain":
+            continue
         z, x, y = p.relative_to(dest).with_suffix("").parts
         idx.setdefault(z, {}).setdefault(x, []).append(int(y))
     for xs in idx.values():
@@ -419,8 +425,11 @@ def make_tiles(cfg, src, dest, area):
 
 
 def digest(root):
+    """Count, bytes and SHA-256 of a tile tree. A region's terrain/ subfolder is its own tree."""
     lines, size = [], 0
     for p in sorted(root.rglob("*.webp")):
+        if root.name != "terrain" and p.relative_to(root).parts[0] == "terrain":
+            continue
         b = p.read_bytes()
         size += len(b)
         lines.append(f"{p.relative_to(root).as_posix()} {hashlib.sha256(b).hexdigest()}")
@@ -445,6 +454,14 @@ def write_regions_index():
             "credit": rec["data"]["credit"],
             "built_utc": rec["built_utc"],
             "tile_count": rec["output"]["tile_count"],
+            **({"terrain": {
+                "url": f"/tiles/landsat/{name}/terrain/{{z}}/{{x}}/{{y}}.webp",
+                "tiles_index": f"/tiles/landsat/{name}/terrain/tiles.json",
+                "zoom": rec["terrain"]["zoom"],
+                "source": rec["terrain"]["label"],
+                "detail_m": rec["terrain"]["detail_m"],
+                "credit": rec["terrain"]["credit"],
+            }} if rec.get("terrain") and (prov.parent / "terrain" / "tiles.json").exists() else {}),
         })
     if regions or (base / "index.json").exists():
         base.mkdir(parents=True, exist_ok=True)
@@ -465,6 +482,11 @@ def main():
     work = ROOT / "data" / "regions-work" / name
     dest = ROOT / "public" / "tiles" / "landsat" / name
     record_path = ROOT / "provenance" / "regions" / f"{name}.json"
+
+    def gdal_messages(cls, _code, msg):
+        if cls >= gdal.CE_Warning:  # through the log, so access tokens are redacted
+            log(f"GDAL: {msg}")
+    gdal.PushErrorHandler(gdal_messages)
 
     def on_term(*_):
         cancelled.set()
@@ -568,6 +590,35 @@ def main():
         size_txt = f"{size / 1e6:.1f} MB" if size >= 1e6 else f"{size / 1e3:.0f} KB"
         out.emit("stage", stage="tile", status="done", detail=f"{count:,} tiles, {size_txt}")
 
+        # 5. terrain: an extra. If it fails, the imagery still stands; the globe uses global terrain
+        terrain = None
+        if cfg.get("terrain", True):
+            out.emit("stage", stage="terrain", status="running")
+            t = time.perf_counter()
+            try:
+                terrain = region_terrain.build(
+                    cfg, area, dest / "terrain", work,
+                    progress=lambda f: out.progress("terrain", f, 1),
+                    cancelled=cancelled.is_set, log=log,
+                )
+            except SystemExit:
+                raise
+            except Exception as e:  # noqa: BLE001
+                shutil.rmtree(dest / "terrain", ignore_errors=True)
+                log(f"terrain failed: {e}")
+                out.emit("stage", stage="terrain", status="failed", detail="failed (see log): global terrain is used")
+                terrain = False
+            timings["terrain"] = round(time.perf_counter() - t, 1)
+            if terrain:
+                tsize = terrain["bytes"]
+                tsize_txt = f"{tsize / 1e6:.1f} MB" if tsize >= 1e6 else f"{tsize / 1e3:.0f} KB"
+                out.emit("stage", stage="terrain", status="done",
+                         detail=f"{terrain['label']}, {terrain['detail_m']} m · {terrain['tile_count']:,} tiles, {tsize_txt}")
+            elif terrain is None:
+                out.emit("stage", stage="terrain", status="skipped", detail="no regional source here: global terrain")
+        else:
+            out.emit("stage", stage="terrain", status="skipped", detail="off for this region")
+
         record = {
             "region": cfg,
             "region_config_sha256": hashlib.sha256(cfg_path.read_bytes()).hexdigest(),
@@ -597,10 +648,15 @@ def main():
                        "clear_view_fraction": round(coverage, 4),
                        "tile_count": count, "bytes": size, "tiles_sha256": tiles_sha},
         }
+        if terrain:
+            _, _, terrain["tiles_sha256"] = digest(dest / "terrain")
+            terrain["path"] = f"public/tiles/landsat/{name}/terrain/{{z}}/{{x}}/{{y}}.webp"
+            record["terrain"] = terrain
         record_path.parent.mkdir(parents=True, exist_ok=True)
         record_path.write_text(json.dumps(record, indent=2) + "\n")
         (dest / "PROVENANCE.json").write_text(json.dumps(record, indent=2) + "\n")
         complete = True
+        write_regions_index()  # before "done": whatever reacts to it (the panel) must find the new layer
         out.emit("done", seconds=record["wall_clock_seconds"]["total"], tiles=count, bytes=size,
                  provenance=str(record_path.relative_to(ROOT)))
     except SystemExit:

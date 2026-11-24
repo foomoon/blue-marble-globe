@@ -185,6 +185,10 @@ async function regionWalkthrough() {
     // 4. The finished layer. The app adds it by itself when the build ends; a fresh page just
     //    means the shot can't race that (it fetches the region list, then its tile list).
     const done = await app({ base: "blue-marble", ...lines }, [-112.02, 36.13, 70_000]);
+    // The region arrives after the page settles: its layer, then its terrain (which reloads the
+    // globe's tiles). The readout names 3DEP once that's in place.
+    await done.waitForFunction(() => document.querySelector(".coords-terrain")?.textContent.includes("3DEP"), null, { timeout: 60_000 });
+    await settle(done);
     await shot(done, "region-4-done");
     await done.close();
   } finally {

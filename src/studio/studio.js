@@ -14,9 +14,10 @@ const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
 const DEFAULTS = { dates: ["2023-06-01", "2024-09-30"], months: [6, 7, 8, 9], max_cloud_percent: 20, scenes_per_location: 4, zoom: [8, 12] };
 const STAGES = [
   { id: "search", label: "Search", weight: 0.03 },
-  { id: "download", label: "Download", weight: 0.5 },
-  { id: "composite", label: "Composite", weight: 0.27 },
-  { id: "tile", label: "Tile", weight: 0.2 },
+  { id: "download", label: "Download", weight: 0.42 },
+  { id: "composite", label: "Composite", weight: 0.2 },
+  { id: "tile", label: "Tile", weight: 0.1 },
+  { id: "terrain", label: "Terrain", weight: 0.25 },
 ];
 // USGS asks for this credit; `true` shows it on screen next to NASA's, not only under "Data attribution"
 const LANDSAT_CREDIT = new Cesium.Credit("Landsat imagery courtesy of the U.S. Geological Survey", true);
@@ -134,6 +135,8 @@ export function mountStudio(viewer, layers) {
           <label>Zoom <select name="z0"></select></label>
           <label>to <select name="z1"></select></label>
         </div>
+        <label class="studio-check" title="Detailed terrain for the region: USGS 3DEP (10 m) in the US, NASADEM (30 m) elsewhere between 60° N and 56° S. Elsewhere the global terrain is used.">
+          <input type="checkbox" name="terrain"> Terrain: 3DEP 10 m (US) or NASADEM 30 m</label>
         <table class="studio-estimate"></table>
         <div class="studio-actions">
           <button type="submit" class="studio-save">Save</button>
@@ -214,6 +217,7 @@ export function mountStudio(viewer, layers) {
     draft.max_cloud_percent = Number(form.cloud.value);
     draft.scenes_per_location = Number(form.per.value);
     draft.zoom = [Number(form.z0.value), Number(form.z1.value)];
+    draft.terrain = form.terrain.checked;
     if (draft.zoom[0] > draft.zoom[1]) draft.zoom[1] = draft.zoom[0];
     render(false);
   });
@@ -354,6 +358,7 @@ export function mountStudio(viewer, layers) {
       form.to.value = draft.dates[1];
       form.cloud.value = draft.max_cloud_percent;
       form.per.value = draft.scenes_per_location ?? 4;
+      form.terrain.checked = draft.terrain ?? true;
       form.z0.value = draft.zoom[0];
     }
     form.z1.value = draft.zoom[1];
@@ -521,7 +526,7 @@ export function mountStudio(viewer, layers) {
       case "stage":
         st.status = ev.status;
         if (ev.detail) st.detail = ev.detail;
-        if (ev.status === "done") st.frac = 1;
+        if (["done", "skipped", "failed"].includes(ev.status)) st.frac = 1;
         if (ev.stage === "tile" && ev.status === "running") {
           fadeBuildVisuals();
           startLiveLayer(ev.url);
@@ -533,6 +538,7 @@ export function mountStudio(viewer, layers) {
           ev.stage === "search" ? `${fmtInt(ev.done)} found`
           : ev.stage === "download" ? `${ev.done.toFixed(1)} / ${ev.total} scenes`
           : ev.stage === "composite" ? `block ${fmtInt(ev.done)} / ${fmtInt(ev.total)}`
+          : ev.stage === "terrain" ? (ev.done < 0.5 ? "reading elevation data" : "building terrain tiles")
           : `${fmtInt(ev.done)} / ~${fmtInt(ev.total)} tiles`;
         break;
       case "scene":
@@ -643,7 +649,7 @@ export function mountStudio(viewer, layers) {
     $(".job-state").textContent = { running: "● building", done: "✓ done", failed: "✕ failed", cancelled: "cancelled" }[job.state];
     stageList.innerHTML = STAGES.map((s, i) => {
       const st = job.stages[s.id];
-      const icon = st.status === "done" ? "✓" : st.status === "running" ? "●" : String(i + 1);
+      const icon = { done: "✓", running: "●", skipped: "–", failed: "!" }[st.status] ?? String(i + 1);
       return `<li data-status="${st.status}"><span class="ico">${icon}</span><span class="name">${s.label}</span>` +
         `<span class="bar"><i style="width:${(st.frac * 100).toFixed(1)}%"></i></span><span class="detail"></span></li>`;
     }).join("");

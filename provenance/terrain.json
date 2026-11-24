@@ -5,7 +5,7 @@
   "encoding": {
     "format": "Terrarium: height_m = R * 256 + G + B / 256 - 32768",
     "image": "256 x 256 WebP, lossless",
-    "heights": "metres above mean sea level (ETOPO's EGM2008 geoid), rounded to whole metres. Not corrected to the WGS84 ellipsoid, so they sit on the globe relative to sea level (the difference is up to about 100 m, depending on place).",
+    "heights": "metres above mean sea level (ETOPO's EGM2008 geoid), rounded to whole metres, unchanged: the reprojection uses ETOPO's horizontal reference only, so GDAL doesn't convert them to the WGS84 ellipsoid. They sit on Cesium's ellipsoid relative to sea level (up to about 100 m from true ellipsoid heights, depending on place).",
     "sea": "Heights below 0 are set to 0, including land below sea level (e.g. the Dead Sea shore, Death Valley). Tiles with no height above 0 aren't written; tiles.json lists those that are.",
     "resampling": "Reprojected once to the zoom-8 Web Mercator grid ('average' where a grid cell is larger than a source cell, otherwise 'bilinear'), then 2 x 2 averages for each zoom out."
   },
@@ -2323,7 +2323,7 @@
       }
     }
   },
-  "built_utc": "2026-11-23T23:12:39Z",
+  "built_utc": "2026-11-24T01:23:09Z",
   "environment": {
     "gdal": "3.13.3",
     "numpy": "2.5.5",
@@ -2332,23 +2332,23 @@
     "processes": 15
   },
   "wall_clock_seconds": {
-    "total": 253.5,
+    "total": 138.9,
     "steps": [
       {
         "step": "download + verify",
-        "seconds": 8.1
+        "seconds": 0.9
       },
       {
         "step": "mosaic (VRT)",
-        "seconds": 0.3
+        "seconds": 0.2
       },
       {
         "step": "reproject + tile zoom 8-4",
-        "seconds": 232.7
+        "seconds": 128.1
       },
       {
         "step": "tile zoom 3-0",
-        "seconds": 3.3
+        "seconds": 3.1
       }
     ]
   },
@@ -2362,8 +2362,8 @@
       0,
       8
     ],
-    "tile_count": 42469,
-    "bytes": 827940312,
-    "tiles_sha256": "cb9a751d26d410dcfa0d458f331db25ef7857d127e54cdf0f06926ba65e2302a"
+    "tile_count": 42671,
+    "bytes": 829771110,
+    "tiles_sha256": "702f323647d67025cb178836bceee14d44e4cd37afd3b5f00de227550e39983c"
   }
 }

@@ -36,6 +36,9 @@ WORLD = [-180, -85.0511, 180, 85.0511]
 NASA = ('Imagery: <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/">'
         "NASA Earth Observatory, Blue Marble: Next Generation</a>")
 NATURAL_EARTH = '<a href="https://www.naturalearthdata.com/">Natural Earth</a> (public domain)'
+NOAA = 'Terrain: <a href="https://www.ncei.noaa.gov/products/etopo-global-relief-model">NOAA NCEI, ETOPO 2022</a>'
+TERRARIUM = ("Elevation tiles, Terrarium encoding: height_m = R * 256 + G + B / 256 - 32768. Land only: "
+             "the sea is 0 m and all-sea tiles aren't served (204).")
 
 
 # Swapped by nginx (sub_filter in mapserver/nginx.conf) for the address each request came in on
@@ -69,8 +72,30 @@ def tiled_layers(base: str) -> list[dict]:
             "license": "Public domain (Natural Earth). No attribution required.",
             "version": grey["built_utc"], "provenance": "/tiles/grey/PROVENANCE.json",
         })
+    terrain = provenance(TILES / "terrain" / "PROVENANCE.json")
+    if terrain:
+        layers.append({
+            "id": "terrain", "name": "Terrain", "kind": "terrain", "format": "webp", "encoding": "terrarium",
+            "description": "NOAA ETOPO 2022, 15 arc-second (about 450 m) global elevation. " + TERRARIUM,
+            "minzoom": 0, "maxzoom": terrain["output"]["zoom"][1], "bounds": WORLD,
+            "attribution": NOAA,
+            "license": "Public domain: not subject to copyright, waived worldwide under CC0 1.0 (NOAA). See /licensing.",
+            "version": terrain["built_utc"], "provenance": "/tiles/terrain/PROVENANCE.json",
+        })
     index = provenance(TILES / "landsat" / "index.json")
     for r in (index or {}).get("regions", []):
+        t = r.get("terrain")
+        if t:
+            layers.append({
+                "id": f"landsat/{r['name']}/terrain", "name": f"{r['title']} terrain ({t['source']})",
+                "kind": "terrain", "format": "webp", "encoding": "terrarium",
+                "description": f"{t['source']}, {t['detail_m']} m elevation for the region, blended into the global "
+                               "terrain at its edge (blue channel: the region's share, adding under 1 m). " + TERRARIUM,
+                "minzoom": t["zoom"][0], "maxzoom": t["zoom"][1], "bounds": r["bbox"],
+                "attribution": t["credit"],
+                "license": "Public domain (USGS) or no restrictions (NASA). See /licensing.",
+                "version": r["built_utc"], "provenance": f"/tiles/landsat/{r['name']}/PROVENANCE.json",
+            })
         w, s, e, n = r["bbox"]
         layers.append({
             "id": f"landsat/{r['name']}", "name": f"{r['title']} (Landsat)", "kind": "raster", "format": "webp",
@@ -118,12 +143,28 @@ def tilejson(layer: dict) -> dict:
         "bounds": layer["bounds"],
         "center": [round((w + e) / 2, 4), round((s + n) / 2, 4), layer["minzoom"]],
         "format": layer["format"],
+        **({"encoding": layer["encoding"]} if layer.get("encoding") else {}),
         "license": layer["license"],
         "provenance": layer["provenance"],
     }
 
 
 def snippets(layer: dict) -> str:
+    if layer["kind"] == "terrain":
+        return f"""// MapLibre: 3D terrain, plus hillshading
+map.addSource("{layer['id']}", {{ type: "raster-dem", url: "{layer['tilejson']}", tileSize: 256, encoding: "terrarium" }});
+map.setTerrain({{ source: "{layer['id']}", exaggeration: 2 }});
+map.addLayer({{ id: "{layer['id']}-hillshade", type: "hillshade", source: "{layer['id']}" }});
+
+// Cesium: decode the tiles with src/terrain.js from this project (Cesium has no Terrarium reader)
+import {{ heightSource, terrainProvider }} from "./terrain.js";
+const {{ zoom, tiles }} = await (await fetch("{layer['tiles'].split('{z}')[0]}tiles.json")).json();
+const available = new Set();
+for (const [z, xs] of Object.entries(tiles)) for (const [x, ys] of Object.entries(xs)) for (const y of ys) available.add(`${{z}}/${{x}}/${{y}}`);
+viewer.terrainProvider = terrainProvider(heightSource([{{ url: "{layer['tiles']}", available,
+  minzoom: zoom[0], maxzoom: zoom[1], detail: 0, shareInBlue: {"true" if "/" in layer["id"] else "false"} }}]));
+
+// The raw heights: any image library, height_m = R * 256 + G + B / 256 - 32768"""
     if layer["kind"] == "vector":
         return f"""// Leaflet
 fetch("{layer['url']}").then((r) => r.json()).then((g) => L.geoJSON(g).addTo(map));
@@ -246,10 +287,12 @@ def index_html(catalog: dict) -> str:
     rows = []
     for layer in catalog["layers"]:
         img = preview(layer)
-        thumb = (f'<img src="{html.escape(img)}" alt="" loading="lazy">' if img else
+        z = img.split("/tiles/")[-1].split("/")[-3] if img and layer["kind"] == "terrain" else ""
+        thumb = (f'<img src="{html.escape(img)}" alt="" data-dem="{z}" crossorigin="anonymous">' if img and layer["kind"] == "terrain" else
+                 f'<img src="{html.escape(img)}" alt="" loading="lazy">' if img else
                  vector_thumbnail(layer["id"]) if layer["kind"] == "vector" else "") or '<div class="vec"></div>'
         meta = (f'<a href="{html.escape(layer["tilejson"])}">TileJSON</a> · zoom {layer["minzoom"]}–{layer["maxzoom"]}'
-                if layer["kind"] == "raster" else
+                if layer["kind"] in ("raster", "terrain") else
                 f'<a href="{html.escape(layer["url"])}">GeoJSON</a> · {layer["features"]:,} features')
         rows.append(f"""
       <article>
@@ -278,7 +321,7 @@ def index_html(catalog: dict) -> str:
     .lede, .meta {{ color: var(--muted); }}
     .meta {{ margin: 2px 0; font-size: 13px; }}
     article {{ display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 18px; padding: 20px 0; border-top: 1px solid var(--line); }}
-    article img, .vec {{ width: 128px; height: 128px; border-radius: 8px; background: #3b3f45; object-fit: cover; }}
+    article img, .vec, canvas.dem {{ width: 128px; height: 128px; border-radius: 8px; background: #3b3f45; object-fit: cover; }}
     h2 {{ margin: 0 0 4px; font-size: 18px; }}
     h2 code {{ font-size: 12px; color: var(--muted); font-weight: 400; }}
     p {{ margin: 0 0 6px; }}
@@ -298,6 +341,32 @@ def index_html(catalog: dict) -> str:
       (ocean in Grey, empty areas of a region) answer <code>204 No Content</code>: treat them as blank.</p>
     {"".join(rows)}
   </main>
+  <script>
+    // Terrain previews: the tiles' colours are heights, so draw them as shaded relief instead
+    for (const img of document.querySelectorAll("img[data-dem]")) {{
+      const draw = () => {{
+        const c = document.createElement("canvas");
+        c.width = c.height = 256;
+        const ctx = c.getContext("2d", {{ willReadFrequently: true }});
+        ctx.drawImage(img, 0, 0);
+        const d = ctx.getImageData(0, 0, 256, 256), p = d.data;
+        const h = new Float32Array(65536);
+        for (let i = 0; i < h.length; i++) h[i] = p[i * 4] * 256 + p[i * 4 + 1] - 32768;
+        const cell = 40075016 / (256 * 2 ** Number(img.dataset.dem)) / 3; // a little exaggerated
+        for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {{
+          const i = y * 256 + x, at = (dx, dy) => h[Math.min(255, Math.max(0, y + dy)) * 256 + Math.min(255, Math.max(0, x + dx))];
+          const gx = (at(1, 0) - at(-1, 0)) / (2 * cell), gy = (at(0, 1) - at(0, -1)) / (2 * cell);
+          const shade = (0.707 - 0.5 * gx + 0.5 * gy) / Math.sqrt(1 + gx * gx + gy * gy); // lit from the north-west
+          const v = h[i] > 0 ? Math.max(0, Math.min(255, 70 + 185 * shade)) : 59;
+          p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = v;
+          p[i * 4 + 3] = 255;
+        }}
+        ctx.putImageData(d, 0, 0);
+        img.replaceWith(Object.assign(c, {{ className: "dem", title: "Shaded from the elevation tile" }}));
+      }};
+      img.complete && img.naturalWidth ? draw() : img.addEventListener("load", draw);
+    }}
+  </script>
 </body>
 </html>
 """
@@ -320,7 +389,7 @@ def main() -> None:
     # mounted and would go on serving the deleted folder (every request a 404).
     files = {WWW / "catalog.json": json.dumps(catalog, indent=2) + "\n", WWW / "index.html": index_html(catalog)}
     for layer in layers:
-        if layer["kind"] == "raster":
+        if layer["kind"] in ("raster", "terrain"):
             files[WWW / "tilejson" / f"{layer['id']}.json"] = json.dumps(tilejson(layer), indent=2) + "\n"
     for path, text in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)

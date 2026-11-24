@@ -59,6 +59,8 @@ export function validateRegion(input) {
     errors.push("zoom: [min, max] integers, max ≤ 13 (13 = 15 m pan-sharpened)");
   const spl = r.scenes_per_location ?? 4;
   if (!Number.isInteger(spl) || spl < 1 || spl > 10) errors.push("scenes_per_location: 1–10");
+  const terrain = r.terrain ?? true;
+  if (typeof terrain !== "boolean") errors.push("terrain: true or false");
   const gamma = r.gamma ?? 1.6;
   if (!num(gamma) || gamma < 0.5 || gamma > 3) errors.push("gamma: 0.5–3");
 
@@ -74,6 +76,7 @@ export function validateRegion(input) {
       max_cloud_percent: r.max_cloud_percent,
       scenes_per_location: spl,
       zoom: [z0, z1],
+      terrain,
       stretch: Array.isArray(r.stretch) && r.stretch.length === 2 && r.stretch.every(num) ? r.stretch : [0, 0.3],
       gamma,
       updated_utc: new Date().toISOString().replace(/\.\d+Z$/, "Z"),

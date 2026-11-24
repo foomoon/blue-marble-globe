@@ -39,7 +39,7 @@ test("catalog lists every layer, each tiled layer has valid TileJSON", async ({ 
   const other = await request.get(url("/catalog.json"), { headers: { Host: "maps.lan:8080" } });
   expect((await other.json()).layers[0].provenance).toMatch(/^http:\/\/maps\.lan:8080\//);
 
-  for (const layer of layers.filter((l) => l.kind === "raster")) {
+  for (const layer of layers.filter((l) => l.kind === "raster" || l.kind === "terrain")) {
     const tj = await request.get(url(layer.tilejson));
     expect(tj.status(), layer.id).toBe(200);
     expect(tj.headers()["content-type"]).toContain("application/json");
@@ -49,6 +49,8 @@ test("catalog lists every layer, each tiled layer has valid TileJSON", async ({ 
     expect(doc.tiles[0]).toBe(`${BASE}/tiles/${layer.id}/{z}/{x}/{y}.${layer.format}`);
     expect(doc.attribution, `${layer.id} carries its attribution`).toBeTruthy();
     expect(doc.bounds).toHaveLength(4);
+    // Terrain says how its colours encode height, for MapLibre's raster-dem
+    if (layer.kind === "terrain") expect(doc.encoding).toBe("terrarium");
   }
 });
 
@@ -56,7 +58,7 @@ test("tiles: real tiles are served with CORS and caching; skipped tiles answer 2
   const { layers } = await (await request.get(url("/catalog.json"))).json();
   const types = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
-  for (const layer of layers.filter((l) => l.kind === "raster")) {
+  for (const layer of layers.filter((l) => l.kind === "raster" || l.kind === "terrain")) {
     // A tile that exists: the build's own tile list says so; without one, the tile at the
     // centre of the layer's bounds at its top zoom
     let have = centreTile(layer.bounds, layer.maxzoom);
@@ -81,8 +83,12 @@ test("tiles: real tiles are served with CORS and caching; skipped tiles answer 2
 
     if (missing) {
       const gap = await request.get(tile(missing));
-      expect(gap.status(), `${layer.id} skipped tile ${missing}`).toBe(204);
       expectCors(gap);
+      if (layer.kind === "terrain") {
+        // Terrain: a flat sea-level tile, since MapLibre's terrain needs a real tile everywhere
+        expect(gap.status(), `${layer.id} sea tile ${missing}`).toBe(200);
+        expect(gap.headers()["content-type"]).toBe("image/webp");
+      } else expect(gap.status(), `${layer.id} skipped tile ${missing}`).toBe(204);
     }
   }
 });
