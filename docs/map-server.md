@@ -18,11 +18,13 @@ To use a different port: `MAPSERVER_PORT=9000 npm run server:up`.
 
 ## 2. After building a layer
 
-```bash
-npm run server:build   # refresh the catalog; no restart needed
-```
+Nothing to do. The container reads `public/tiles/` and `public/vectors/` directly (mounted read-only, not copied), so new or rebuilt tiles are served straight away. And every build (Blue Marble, Grey, terrain, vectors, and each region, including from the Regions panel) refreshes the server's home page, catalog and TileJSON as its last step, so the new layer is listed too. No restart.
 
-The container reads `public/tiles/` and `public/vectors/` directly (mounted read-only, not copied), so new or rebuilt tiles are served straight away. This command only updates the list of layers and their TileJSON.
+That refresh only runs once the server is set up (after the first `npm run server:up`), and it keeps a published address (`--base-url`). To refresh by hand, after deleting a layer's tiles for example:
+
+```bash
+npm run server:build
+```
 
 ## 3. What it serves
 

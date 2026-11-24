@@ -194,6 +194,11 @@ def main():
     for t in timings:
         print(f"  {t['step']:<16} {t['seconds']:>7.1f} s")
 
+    # The new layer on the map server's home page and catalog, if the server is set up
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from build_server import refresh
+    refresh()
+
 
 if __name__ == "__main__":
     main()

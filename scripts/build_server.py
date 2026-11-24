@@ -384,8 +384,18 @@ def index_html(catalog: dict) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base-url", default=ORIGIN, help="public URL of the server, e.g. https://maps.example.com")
-    base = ap.parse_args().base_url.rstrip("/")
+    ap.add_argument("--base-url", help="public URL of the server, e.g. https://maps.example.com "
+                                       "(default: the one used last time, else each request's own address)")
+    ap.add_argument("--refresh", action="store_true",
+                    help="what the build scripts run when they finish: only if the server's catalog already "
+                         "exists (the server is set up), and one line of output")
+    args = ap.parse_args()
+    previous = WWW / "catalog.json"
+    if args.refresh and not previous.exists():
+        return  # no map server set up here: nothing to refresh
+    # Keep a published address (--base-url) across refreshes
+    last = json.loads(previous.read_text()).get("base_url") if previous.exists() else None
+    base = (args.base_url or last or ORIGIN).rstrip("/")
 
     layers = tiled_layers(base) + vector_layers(base)
     catalog = {
@@ -411,9 +421,24 @@ def main() -> None:
             path.unlink()
         elif path.is_dir() and not any(path.iterdir()):
             path.rmdir()
-    print(f"{len(layers)} layers -> {WWW.relative_to(ROOT)}/ (base URL: {"each request's own address" if base == ORIGIN else base})")
+    where = "each request's own address" if base == ORIGIN else base
+    if args.refresh:
+        return print(f"map server catalog refreshed: {len(layers)} layers ({where})")
+    print(f"{len(layers)} layers -> {WWW.relative_to(ROOT)}/ (base URL: {where})")
     for layer in layers:
         print(f"  {layer['kind']:<6} {layer['id']}")
+
+
+def refresh() -> None:
+    """For the build scripts: refresh the map server's page and catalog if it's set up. Never fails
+    a build: a problem here is printed, and the build's own result stands."""
+    import subprocess
+    import sys
+    sys.stdout.flush()  # the build's own output first
+    try:
+        subprocess.run([sys.executable, str(Path(__file__)), "--refresh"], check=True, timeout=120)
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"(map server catalog not refreshed: {e}; run npm run server:build)")
 
 
 if __name__ == "__main__":

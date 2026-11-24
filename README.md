@@ -168,7 +168,7 @@ When the build finishes, the region appears on the globe automatically, here as 
 ![The finished region: sharp Landsat imagery of the Grand Canyon inside the polygon](docs/images/region-4-done.jpg)
 
 - It's listed under **Layers → Regions**, with a toggle, an opacity slider and **Go** to fly there. It shows up in the production build too (`npm run build`).
-- **The map server** serves it after `npm run server:build`.
+- **The map server** lists and serves it straight away: the build refreshes the server's home page and catalog when it finishes.
 - **Files:**
   - `regions/<name>.json`: the config. Commit it.
   - `provenance/regions/<name>.json`: the record of every Landsat scene used, with its URLs, ETags and sizes, plus the timings and a digest of the tiles. Commit it.
@@ -234,7 +234,7 @@ Serves the layers you've built to **any web map** (Leaflet, MapLibre, OpenLayers
 npm run server:up      # write the catalog, build the image, start on http://localhost:8080
 npm run test:server    # check it end to end (6 tests)
 npm run server:down    # stop it
-npm run server:build   # after building or rebuilding a layer: refresh the catalog (no restart needed)
+npm run server:build   # refresh the catalog by hand (every build already does it when it finishes)
 ```
 
 The full guide is [docs/map-server.md](docs/map-server.md), also in the app's Guide under *Serve to other maps*. Open **http://localhost:8080** for every layer with a preview, its attribution and copy-paste code for each library. Pick a different port with `MAPSERVER_PORT=9000 npm run server:up`.

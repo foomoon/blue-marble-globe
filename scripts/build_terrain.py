@@ -346,6 +346,11 @@ def main() -> None:
     for s in record["wall_clock_seconds"]["steps"]:
         print(f"  {s['step']:<28} {s['seconds']:>8.1f} s")
 
+    # The new layer on the map server's home page and catalog, if the server is set up
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from build_server import refresh
+    refresh()
+
 
 if __name__ == "__main__":
     main()

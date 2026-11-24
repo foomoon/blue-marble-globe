@@ -169,6 +169,10 @@ def main() -> None:
     layers = {layer["name"]: build(layer, records.get(layer["name"])) for layer in LAYERS}
     RECORD.write_text(json.dumps({"layers": layers}, indent=2) + "\n")
 
+    # The new layer on the map server's home page and catalog, if the server is set up
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from build_server import refresh
+    refresh()
 
 if __name__ == "__main__":
     main()

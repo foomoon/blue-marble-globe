@@ -475,6 +475,14 @@ def write_regions_index():
     if regions or (base / "index.json").exists():
         base.mkdir(parents=True, exist_ok=True)
         (base / "index.json").write_text(json.dumps({"regions": regions}, indent=2) + "\n")
+        # The map server's home page and catalog list regions too: refresh them (if it's set up)
+        try:
+            r = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_server.py"), "--refresh"],
+                               capture_output=True, text=True, timeout=120)
+            if r.stdout.strip():
+                log(r.stdout.strip())
+        except (OSError, subprocess.SubprocessError) as e:
+            log(f"map server catalog not refreshed: {e}; run npm run server:build")
 
 
 # ---------------------------------------------------------------- main

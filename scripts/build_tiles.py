@@ -357,6 +357,11 @@ def main() -> None:
         shutil.rmtree(WORK)
         print(f"Removed data/work/ ({freed / 1e9:.1f} GB). Use --keep-work to keep it.")
 
+    # The new layer on the map server's home page and catalog, if the server is set up
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from build_server import refresh
+    refresh()
+
 
 if __name__ == "__main__":
     main()

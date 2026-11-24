@@ -2,7 +2,7 @@
 // progress UI. Uses the real Landsat catalogue over the internet and takes about a
 // minute, so it's opt-in:  npm run test:build
 import { execFileSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 const NAME = "e2e-boulder";
@@ -72,6 +72,11 @@ test("build a region from the panel with live progress", async ({ page, request 
   // Boulder is in the US: 10 m terrain from USGS 3DEP
   await expect(stageRow("Terrain")).toContainText("USGS 3DEP, 10 m");
   expect(existsSync(`public/tiles/landsat/${NAME}/terrain/tiles.json`)).toBe(true);
+  // With the map server set up, the build lists the new region on it by itself
+  if (existsSync("mapserver/www/catalog.json")) {
+    const ids = JSON.parse(readFileSync("mapserver/www/catalog.json", "utf8")).layers.map((l) => l.id);
+    expect(ids).toEqual(expect.arrayContaining([`landsat/${NAME}`, `landsat/${NAME}/terrain`]));
+  }
   await expect(item).toContainText("built");
 
   // The finished layer on the globe
