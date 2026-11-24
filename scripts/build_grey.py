@@ -52,7 +52,8 @@ commands, timings = [], []
 
 def run(step, cmd):
     print("\n$ " + " ".join(cmd), flush=True)
-    commands.append([a if not a.startswith(str(ROOT)) else os.path.relpath(a, ROOT) for a in cmd])
+    # Paths relative to the project (also inside /vsizip/...): the same record on any machine
+    commands.append([a.replace(str(ROOT) + "/", "") for a in cmd])
     t = time.perf_counter()
     subprocess.run(cmd, check=True)
     timings.append({"step": step, "seconds": round(time.perf_counter() - t, 1)})

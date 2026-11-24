@@ -7,7 +7,7 @@ The **map server** shares the layers you've built with any web map: Leaflet, Map
 You need Docker running (on a Mac, open Docker Desktop). Then:
 
 ```bash
-npm run server:up      # build and start on http://localhost:8080
+npm run server:up      # build and start on http://localhost:8080: the map server and the builder
 npm run test:server    # optional: check it end to end
 npm run server:down    # stop it
 ```
@@ -40,7 +40,7 @@ npm run server:build
 | `/provenance/` | Every build record and archived terms |
 | `/licensing`, `/notice` | `LICENSING.md` and `NOTICE` |
 
-Layer ids are `blue-marble`, `grey`, `landsat/<region>` (for example `landsat/guam`), `terrain` and `landsat/<region>/terrain` for elevation, and `country-borders`, `us-states`, `coastlines` for the vectors. Only layers you've built appear.
+Layer ids are `blue-marble`, `grey`, `landsat/<region>` (for example `landsat/everest`), `terrain` and `landsat/<region>/terrain` for elevation, and `country-borders`, `us-states`, `coastlines` for the vectors. Only layers you've built appear.
 
 **Missing imagery tiles answer `204 No Content`, not `404`.** Grey has no ocean tiles and a region has none outside its area; those were skipped on purpose. `204` tells a web map "blank here" without logging an error.
 
@@ -58,9 +58,9 @@ A map needs **one base map** underneath, then any overlays on top:
 | --- | --- | --- | --- |
 | Blue Marble | base map | `/tiles/blue-marble-webp/{z}/{x}/{y}.webp` (the default build), or `/tiles/blue-marble/{z}/{x}/{y}.jpg` if built as JPEG | 0–8 |
 | Grey | base map (transparent water: give the map a dark background) | `/tiles/grey/{z}/{x}/{y}.png` | 0–9 |
-| Landsat region | detail overlay for one area | `/tiles/landsat/<region>/{z}/{x}/{y}.webp` | per region, e.g. Guam 8–12 |
+| Landsat region | detail overlay for one area | `/tiles/landsat/<region>/{z}/{x}/{y}.webp` | per region, e.g. Everest 8–12 |
 | Terrain | elevation, for 3D and hillshading | `/tiles/terrain/{z}/{x}/{y}.webp` | 0–8 |
-| A region's terrain | sharper elevation for one area | `/tiles/landsat/<region>/terrain/{z}/{x}/{y}.webp` | per region, e.g. Guam 8–14 |
+| A region's terrain | sharper elevation for one area | `/tiles/landsat/<region>/terrain/{z}/{x}/{y}.webp` | per region, e.g. Everest 8–12 |
 | Borders, US states, coastlines | line overlays | `/vectors/<name>.geojson` | any |
 
 **About zoom.** A layer's top zoom is how much detail its source has, not a limit on the map. Blue Marble is 500 m per pixel, and zoom 8 already shows all of it. You can keep zooming in; the library enlarges the zoom-8 tiles, so they just get softer. Tell it the top zoom (`maximumLevel` in Cesium, `maxNativeZoom` in Leaflet; MapLibre and OpenLayers read it from the TileJSON), or it will ask for tiles that don't exist. For sharp imagery closer in, lay a **Landsat region** (30 m, to zoom 12) over the base map. Build one in the Regions panel and it appears on the server.
@@ -95,11 +95,11 @@ const viewer = new Cesium.Viewer("globe", {
 // 2. More detail in one area: a Landsat region on top. minimumLevel and rectangle (from the
 //    index page) make Cesium ask only for tiles inside the region, at zooms it has.
 viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
-  url: `${SERVER}/tiles/landsat/guam/{z}/{x}/{y}.webp`,
+  url: `${SERVER}/tiles/landsat/everest/{z}/{x}/{y}.webp`,
   tilingScheme: new Cesium.WebMercatorTilingScheme(),
   minimumLevel: 8,
   maximumLevel: 12,
-  rectangle: Cesium.Rectangle.fromDegrees(144.51267, 13.18326, 145.04981, 13.7013),
+  rectangle: Cesium.Rectangle.fromDegrees(86.87716, 27.74999, 87.21799, 28.04424),
   credit: new Cesium.Credit("Landsat imagery courtesy of the U.S. Geological Survey", true),
 }));
 
@@ -146,7 +146,7 @@ map.setTerrain({ source: "dem", exaggeration: 2 });                 // 3D
 map.addLayer({ id: "hills", type: "hillshade", source: "dem" });   // shaded relief
 ```
 
-For one region, use its terrain instead (`/tiles/landsat/guam/terrain/tilejson.json`). It covers the region's box. Inside its outline it's the region's own 10 m or 30 m data, blending into the global heights at the edge, so it has no cliff there. MapLibre takes one terrain source at a time.
+For one region, use its terrain instead (`/tiles/landsat/everest/terrain/tilejson.json`). It covers the region's box. Inside its outline it's the region's own 10 m or 30 m data, blending into the global heights at the edge, so it has no cliff there. MapLibre takes one terrain source at a time.
 
 ### Leaflet
 
@@ -181,9 +181,9 @@ new ol.layer.Vector({
 
 ### This project's globe
 
-**It's on the server:** http://localhost:8080/globe/, built by `npm run server:up` (or `npm run server:globe`). Same address as the data, so it just works; its label says **Data: this server**.
+**It's on the server:** http://localhost:8080/globe/, built by `npm run server:up` (or `npm run server:globe`). Same address as the data, so it just works. Its **Server** light (top right) is green while the server answers, red when it doesn't, and its **Admin** pill (top left) leads to the admin page.
 
-**Or run it separately** and point it at the server: set the server's address when starting or building the globe: `VITE_MAP_SERVER_URL=http://localhost:8080 npm run dev`. It then takes every tile, terrain tile, region and line from the server, and the **Data: map server** label (top right) shows a green dot while the server answers. Without the setting, it reads its own files: **Data: local**.
+**Or run it separately** and point it at the server: set the server's address when starting or building the globe: `VITE_MAP_SERVER_URL=http://localhost:8080 npm run dev`. It then takes every tile, terrain tile, region and line from the server, and its **Server** light (top right) shows whether the server is answering. Without the setting, it reads its own files, and has no light.
 
 ### The admin page: building regions on the server
 
@@ -208,11 +208,46 @@ Builds run in the **builder** container (`mapserver/builder/Dockerfile`): GDAL, 
   ```
 
   Let the proxy handle HTTPS; the server honours its `X-Forwarded-Proto` header.
-- **The admin page over the network:** on anything but your own network, put the server behind HTTPS (a reverse proxy, as above, sending `X-Forwarded-Proto: https`), or the password and session cookie travel unencrypted.
-- **Copying the tiles to another machine:** use `rsync -aH` (or `cp -a`, or `tar`), which keeps hard links. Grey stores its identical tiles once as hard links; a plain copy expands it from ~150 MB to ~620 MB.
+- **The admin page over the network:** on anything but your own machine, use HTTPS (below), or the password and session cookie travel unencrypted.
+- **Copying the tiles to another machine:** use `rsync -aH` (or `cp -a`, or `tar`), which keeps hard links. Grey stores its identical tiles once as hard links; a plain copy expands it from ~150 MB to ~620 MB. No tile has more than 60,000 links, so they fit Linux's ext4 limit (65,000).
 - **Caching.** Tiles are cached for a day. The catalog and TileJSON are always revalidated, so a refreshed catalog shows up immediately.
 
-## 6. Attribution travels with the layers
+## 6. HTTPS
+
+The map server serves HTTPS itself as soon as it has a certificate: put `server.crt` (with any intermediate certificates after it) and `server.key` in `mapserver/tls/`, and restart (`npm run server:up`). Plain HTTP then redirects to HTTPS. HTTPS is on port **8443** here (`MAPSERVER_HTTPS_PORT` to change), **443** in an offline install.
+
+Where the certificate comes from:
+
+- **Your network's own certificate authority (CA)**, if it has one: its devices already trust it. Ask for a certificate for the server's name and IP address.
+- **The project's private CA**, if not: `npm run server:cert -- maps.example.internal 10.20.0.5` (the names and IP addresses devices will use). The first run creates the CA in `mapserver/ca/` (keep its key safe, off any air-gapped network: it's only needed to issue the next certificate); each run writes `mapserver/tls/server.crt` and `server.key` (valid 825 days, the most Apple devices accept) and `ca.crt`, which each device must trust once (commands in the bundle's README.txt). None of these are committed.
+- **Behind a reverse proxy** that handles HTTPS, leave `mapserver/tls/` empty: the server honours its `X-Forwarded-Proto` header.
+
+**Names without DNS:** add a line to each device's hosts file (`/etc/hosts`; Windows: `C:\Windows\System32\drivers\etc\hosts`), e.g. `10.20.0.5  maps.example.internal`. The name must be one the certificate was made for.
+
+## 7. Air-gapped networks: offline bundles
+
+Build and update on a network with internet, then carry the result to the air-gapped one, where it runs **serve-only**: the globe and the layers, with no admin page, builder or sign-in (region builds need the internet). The globe makes no requests anywhere but the map server, so it works fully offline.
+
+On the connected side:
+
+```bash
+npm run maps        # the map data (and regions, from the admin page, as usual)
+npm run bundle      # bundles/blue-marble-globe-<date>/, for linux/amd64 (--platform linux/arm64 for ARM)
+```
+
+The bundle (about 1.3 GB today) holds the map server image (25 MB), the map data, `install.sh`, `README.txt`, `ca.crt` if you made a private CA, and `SHA256SUMS`. Never the admin login, the HTTPS key or the CA's key.
+
+On the air-gapped server (Linux with Docker and its compose plugin; nothing else, and no internet):
+
+```bash
+./install.sh                     # into /opt/blue-marble-globe (or give another folder)
+```
+
+It checks every file against `SHA256SUMS` (a damaged copy is refused before anything changes), loads the image, unpacks the data as a new release, switches to it and restarts. The previous release is kept, for going back. **Updates** are the same: a new bundle, carried across, `./install.sh`. For HTTPS, put `server.crt` and `server.key` in `/opt/blue-marble-globe/tls/` once and run `install.sh` again; ports are in `.env` there (80 and 443). The bundle's `README.txt` has the details, including trusting the CA on each device.
+
+Tested in a simulated air-gapped x86-64 Linux server (Docker inside Docker, networking off): install, HTTPS by name and IP, an update, and a damaged bundle being refused.
+
+## 8. Attribution travels with the layers
 
 Every layer's TileJSON and catalog entry carries its attribution, and MapLibre, OpenLayers and Leaflet (with the `attribution` option) show it in the map's corner. Keep it there: NASA and USGS ask for credit, and neither endorses the maps. Natural Earth is public domain and asks for nothing. The details are in `LICENSING.md`, which the server also serves at `/licensing`.
 
@@ -221,7 +256,15 @@ Every layer's TileJSON and catalog entry carries its attribution, and MapLibre, 
 | File | Role |
 | --- | --- |
 | `scripts/build_server.py` | Reads the provenance records and writes the catalog, TileJSON and index page to `mapserver/www/` |
-| `mapserver/nginx.conf` | The URL routes, `204` for skipped tiles, caching, gzip |
+| `mapserver/site.conf` | The URL routes, `204` for skipped tiles, caching, gzip |
+| `mapserver/admin.conf` | The admin page, sign-in and API routes, all handled by the builder |
+| `mapserver/http.conf` | Settings outside the server: the address scheme, the sign-in rate limit |
+| `mapserver/mapserver-config.sh` | At start-up, puts these together: HTTPS if there's a certificate, admin routes unless `MAPSERVER_ADMIN=off` |
+| `mapserver/builder/Dockerfile` | The builder: GDAL, Python, numpy and Node, for map and region builds |
+| `server/admin-api.js`, `auth.js`, `studio-api.js` | The builder's API: sign-in and sessions, regions and build jobs |
+| `mapserver/login/` | The sign-in page |
+| `mapserver/airgap/` | What an offline bundle carries: its compose file, `install.sh`, `README.txt` |
+| `scripts/bundle.sh`, `make-cert.sh` | `npm run bundle`, `npm run server:cert` |
 | `mapserver/cors.conf`, `origin.conf` | Cross-origin headers; filling in the server's own address |
 | `mapserver/Dockerfile` | `nginx` on Alpine, with a health check at `/healthz` |
 | `compose.yaml` | Port and the read-only mounts of tiles, vectors, provenance and licensing |

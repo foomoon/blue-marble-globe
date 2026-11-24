@@ -412,6 +412,13 @@ def write_index(dest, zoom):
     (dest / "tiles.json").write_text(json.dumps({"zoom": zoom, "tiles": idx}, separators=(",", ":")))
 
 
+
+def make_readable(root) -> None:
+    """gdal2tiles' WebP driver writes tiles readable only by their owner (0600). Tiles are public
+    data, served by nginx as another user: on Linux it couldn't read them. Files 644, folders 755."""
+    for p in root.rglob("*"):
+        os.chmod(p, 0o755 if p.is_dir() else 0o644)
+
 def make_tiles(cfg, src, dest, area):
     z0, z1 = cfg["zoom"]
     gdal2tiles = shutil.which("gdal2tiles") or shutil.which("gdal2tiles.py")
@@ -430,6 +437,7 @@ def make_tiles(cfg, src, dest, area):
         raise SystemExit(130)
     if proc.returncode:
         raise RuntimeError(f"gdal2tiles failed: {proc.stderr.read()[-500:]}")
+    make_readable(dest)
     return cmd
 
 

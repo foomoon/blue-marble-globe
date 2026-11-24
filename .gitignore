@@ -23,7 +23,13 @@ mapserver/globe/
 # The admin page (npm run server:admin) and its password file (npm run server:password)
 mapserver/admin/
 mapserver/auth/
+# HTTPS: the certificate in use, and the private CA that issues it (npm run server:cert)
+mapserver/tls/
+mapserver/ca/
 
 # Your own settings for Vite, e.g. VITE_MAP_SERVER_URL (see .env.example)
 .env.local
 .env.*.local
+
+# Offline bundles for air-gapped networks (npm run bundle)
+bundles/

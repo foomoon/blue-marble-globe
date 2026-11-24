@@ -30,7 +30,7 @@
         "-sql",
         "SELECT GEOMETRY, NAME AS name, CASE WHEN FEATURECLA LIKE 'International boundary%' THEN 'international' ELSE 'disputed' END AS kind, FEATURECLA AS natural_earth_class FROM ne_50m_admin_0_boundary_lines_land",
         "public/vectors/country-borders.geojson",
-        "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_50m_admin_0_boundary_lines_land.zip/ne_50m_admin_0_boundary_lines_land.shp"
+        "/vsizip/data/source/naturalearth/ne_50m_admin_0_boundary_lines_land.zip/ne_50m_admin_0_boundary_lines_land.shp"
       ],
       "post_processing": "coordinates rounded to 4 decimals (round half to even) and written in one fixed layout by scripts/fetch_vectors.py, so the output is the same with any GDAL version",
       "output": {
@@ -70,7 +70,7 @@
         "-sql",
         "SELECT GEOMETRY, NAME AS name FROM ne_50m_admin_1_states_provinces_lines WHERE ADM0_A3 = 'USA'",
         "public/vectors/us-states.geojson",
-        "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_50m_admin_1_states_provinces_lines.zip/ne_50m_admin_1_states_provinces_lines.shp"
+        "/vsizip/data/source/naturalearth/ne_50m_admin_1_states_provinces_lines.zip/ne_50m_admin_1_states_provinces_lines.shp"
       ],
       "post_processing": "coordinates rounded to 4 decimals (round half to even) and written in one fixed layout by scripts/fetch_vectors.py, so the output is the same with any GDAL version",
       "output": {
@@ -110,7 +110,7 @@
         "-sql",
         "SELECT GEOMETRY FROM ne_50m_coastline",
         "public/vectors/coastlines.geojson",
-        "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_50m_coastline.zip/ne_50m_coastline.shp"
+        "/vsizip/data/source/naturalearth/ne_50m_coastline.zip/ne_50m_coastline.shp"
       ],
       "post_processing": "coordinates rounded to 4 decimals (round half to even) and written in one fixed layout by scripts/fetch_vectors.py, so the output is the same with any GDAL version",
       "output": {

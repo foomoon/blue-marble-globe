@@ -132,7 +132,8 @@ def build(layer: dict, previous: dict | None) -> dict:
             "http_last_modified": headers.get("last-modified"),
             "retrieved_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         },
-        "conversion": [a if not a.startswith(str(ROOT)) else str(Path(a).relative_to(ROOT)) for a in cmd],
+        # Paths relative to the project (also inside /vsizip/...): the same record on any machine
+        "conversion": [a.replace(str(ROOT) + "/", "") for a in cmd],
         "post_processing": f"coordinates rounded to {DECIMALS} decimals (round half to even) and written in one fixed "
                            "layout by scripts/fetch_vectors.py, so the output is the same with any GDAL version",
         "output": {"path": str(out.relative_to(ROOT)), "features": len(feats),

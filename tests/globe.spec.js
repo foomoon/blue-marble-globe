@@ -248,17 +248,26 @@ test("terrain heights are above sea level, and regional terrain agrees with the 
       const [R, G, B] = ctx.getImageData(Math.floor((fx % 1) * 256), Math.floor((fy % 1) * 256), 1, 1).data;
       return R * 256 + G + (shareInBlue ? 0 : B / 256) - 32768;
     }, { root, z, lon, lat, shareInBlue });
-  // Guam International Airport: ~80 m in both ETOPO and 3DEP. Guam is where it shows most: the geoid
-  // is ~55 m above the ellipsoid there, so heights converted to the ellipsoid would read ~135 m.
-  const global = await heightAt("/tiles/terrain", 8, 144.796, 13.4834, false);
-  expect(global, "global terrain at Guam's airport").toBeGreaterThan(60);
-  expect(global).toBeLessThan(100);
-  if (existsSync("public/tiles/landsat/guam/terrain/tiles.json")) {
-    for (const [lon, lat] of [[144.796, 13.4834], [144.93, 13.584], [144.84, 13.52]]) {
-      const regional = await heightAt("/tiles/landsat/guam/terrain", 14, lon, lat, true);
+  // Keflavik airport, Iceland: ~50 m above sea level (47 in the global terrain). The geoid is ~64 m
+  // above the ellipsoid there, so heights wrongly converted to the ellipsoid would read ~110 m.
+  const global = await heightAt("/tiles/terrain", 8, -22.6056, 63.985, false);
+  expect(global, "global terrain at Keflavik airport").toBeGreaterThan(25);
+  expect(global).toBeLessThan(80);
+  // A region's terrain, on average over its area, agrees with the global terrain: same reference,
+  // same encoding. (The 30 m data resolves the peaks the 600 m global cells average away, so the
+  // regional mean runs a little higher: +33 m over Everest's.)
+  if (existsSync("public/tiles/landsat/everest/terrain/tiles.json")) {
+    const regional = [], glob = [];
+    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
+      const lon = 86.9 + i * 0.045, lat = 27.78 + j * 0.04;
+      const r = await heightAt("/tiles/landsat/everest/terrain", 12, lon, lat, true);
       const g = await heightAt("/tiles/terrain", 8, lon, lat, false);
-      expect(Math.abs(regional - g), `3DEP ${regional} m vs ETOPO ${g} m at ${lon}, ${lat}`).toBeLessThan(15);
+      if (r != null && g != null) regional.push(r), glob.push(g);
     }
+    const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+    expect(regional.length).toBeGreaterThan(40);
+    const diff = mean(regional) - mean(glob);
+    expect(Math.abs(diff), `regional mean ${mean(regional)} m vs global ${mean(glob)} m`).toBeLessThan(60);
   }
 });
 

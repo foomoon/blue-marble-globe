@@ -1,0 +1,23 @@
+# Blue Marble Globe map server, serve-only (no admin page, no builds), as installed from a bundle
+# on a network without internet. install.sh puts this file in the install folder and fills in
+# the image version. Settings go in .env next to it (install.sh keeps it): HTTP_PORT, HTTPS_PORT.
+name: blue-marble-globe
+services:
+  mapserver:
+    image: blue-marble-globe/mapserver:__VERSION__
+    ports:
+      - "${HTTP_PORT:-80}:8080"
+      - "${HTTPS_PORT:-443}:8443"
+    environment:
+      MAPSERVER_ADMIN: "off"
+      MAPSERVER_HTTPS_PORT: ${HTTPS_PORT:-443}
+    volumes:
+      - ./current/www:/srv/www:ro
+      - ./current/globe:/srv/globe:ro
+      - ./current/tiles:/srv/tiles:ro
+      - ./current/vectors:/srv/vectors:ro
+      - ./current/provenance:/srv/provenance:ro
+      - ./current/LICENSING.md:/srv/docs/LICENSING.md:ro
+      - ./current/NOTICE:/srv/docs/NOTICE:ro
+      - ./tls:/etc/nginx/tls:ro     # server.crt + server.key: HTTPS (see README.txt)
+    restart: unless-stopped

@@ -8,9 +8,21 @@ Everything the globe shows is built on your machine from public-domain sources, 
 | **Grey** base map | Natural Earth 1:10m land + lakes | `npm run build:grey` | ~6 min | ~150 MB on disk |
 | **Terrain** | NOAA ETOPO 2022, 15″ | `npm run build:terrain` | ~13 min: 8½ to download, 4 to build | ~830 MB |
 | **Borders, states, coastlines** | Natural Earth 1:50m | `npm run fetch:vectors` | seconds | ~1.8 MB (committed) |
-| **Landsat regions** | USGS Landsat 8/9 | Regions panel (dev) | minutes per region | varies |
+| **Landsat regions** | USGS Landsat 8/9 | Regions panel (admin page) | minutes per region | varies |
 
 Tiles go in `public/tiles/` (gitignored, reproducible). The vector files are small, so they're committed in `public/vectors/`. Times are from an Apple Silicon Mac.
+
+## The easy way: everything in Docker
+
+```bash
+npm run maps                  # every step not built yet, in the map server's builder container
+npm run maps -- --list        # which steps are built
+npm run maps -- --only grey   # particular steps (--force rebuilds)
+```
+
+The builder container (`mapserver/builder/Dockerfile`) pins GDAL, Python and numpy, so the tiles come out the same on any machine; you only need Docker. It runs the same scripts described below, in order: vectors, Blue Marble tiles, Grey, terrain, then the map server's catalog. Each step is skipped when it's already built (its `PROVENANCE.json` exists), and downloads are kept and checksum-verified, so stopping and re-running carries on where it left off. Build records note the environment, so they'll say Linux and the builder's versions.
+
+The rest of this page is each step in detail, and how to run them without Docker.
 
 ## What you need
 
@@ -90,7 +102,7 @@ This needs the project's `.venv` (numpy and GDAL's Python bindings; setup is in 
 
 **Heights are relative to sea level** (ETOPO uses the EGM2008 geoid), placed on Cesium's WGS84 ellipsoid without correction. Depending on the place, the difference is up to about 100 m. That's invisible on a globe, but this terrain isn't the thing to measure precise heights against.
 
-The build has to take care to *keep* them relative to sea level. ETOPO's files declare their reference as "WGS 84 + EGM2008 height", and given that, GDAL converts heights to the ellipsoid on reprojection, adding the local geoid height (+55 m at Guam). The build reprojects with the horizontal reference only, so heights pass through unchanged. The regional terrain does the same, so the two agree (a test checks this at Guam).
+The build has to take care to *keep* them relative to sea level. ETOPO's files declare their reference as "WGS 84 + EGM2008 height", and given that, GDAL converts heights to the ellipsoid on reprojection, adding the local geoid height (+64 m in Iceland). The build reprojects with the horizontal reference only, so heights pass through unchanged. The regional terrain does the same, so the two agree (a test checks the heights at Keflavik, Iceland, where the geoid is +64 m, and compares a region's terrain with the global terrain).
 
 **Result:** 42,469 tiles, 828 MB (about 880 MB on disk), built in 4 min 14 s using 15 processes on an Apple Silicon Mac, after an 8½-minute download. Only about 40% of zoom-8 tiles have land, which is why it's far smaller than all 87,381.
 
@@ -112,9 +124,9 @@ npm run fetch:vectors  # -> public/vectors/*.geojson
 
 **Adding another Natural Earth layer** (e.g. Canadian provinces) takes one entry in `LAYERS` in `scripts/fetch_vectors.py` (dataset, filter, fields) and one in `VECTORS` in `src/layers.js` (title, colour role). See *Add layers in code*.
 
-## Landsat regions (dev)
+## Landsat regions
 
-Higher-resolution (30 m) regional layers are drawn and built in the **Regions** panel, which only exists under `npm run dev`. Each also gets its own terrain: USGS 3DEP at 10 m in the US, NASADEM at 30 m elsewhere (`scripts/region_terrain.py`), blended into the global terrain at its edge. The README covers setup and how a build works. Each build records every Landsat scene and elevation file it used in `provenance/regions/<name>.json`.
+Higher-resolution (30 m) regional layers are drawn and built in the **Regions** panel: on the map server's admin page (http://localhost:8080/admin/, builds run in the builder container), or under `npm run dev` (builds run on your machine). Each also gets its own terrain: USGS 3DEP at 10 m in the US, NASADEM at 30 m elsewhere (`scripts/region_terrain.py`), blended into the global terrain at its edge. The README covers setup and how a build works. Each build records every Landsat scene and elevation file it used in `provenance/regions/<name>.json`.
 
 ## Making your own tileset
 

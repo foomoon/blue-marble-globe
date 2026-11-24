@@ -40,7 +40,7 @@
       "180",
       "85.05112878",
       "data/work/grey/ne_10m_land_3857.gpkg",
-      "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_10m_land.zip/ne_10m_land.shp"
+      "/vsizip/data/source/naturalearth/ne_10m_land.zip/ne_10m_land.shp"
     ],
     [
       "ogr2ogr",
@@ -54,7 +54,7 @@
       "180",
       "85.05112878",
       "data/work/grey/ne_10m_lakes_3857.gpkg",
-      "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_10m_lakes.zip/ne_10m_lakes.shp"
+      "/vsizip/data/source/naturalearth/ne_10m_lakes.zip/ne_10m_lakes.shp"
     ],
     [
       "gdal_rasterize",
@@ -106,7 +106,7 @@
       "512"
     ],
     [
-      "/opt/homebrew/bin/gdal2tiles",
+      "/usr/bin/gdal2tiles",
       "--xyz",
       "-z",
       "0-9",
@@ -118,14 +118,14 @@
       "public/tiles/grey"
     ]
   ],
-  "built_utc": "2026-11-23T00:24:59Z",
+  "built_utc": "2026-11-24T20:00:48Z",
   "environment": {
     "gdal": "GDAL 3.13.3 \"Iowa City\", released 2026/08/13",
-    "python": "3.15.2",
-    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O"
+    "python": "3.14.4",
+    "platform": "Linux-6.12.76-linuxkit-aarch64-with-glibc2.43"
   },
   "wall_clock_seconds": {
-    "total": 375.1,
+    "total": 552.4,
     "steps": [
       {
         "step": "reproject land",
@@ -133,25 +133,35 @@
       },
       {
         "step": "reproject lakes",
-        "seconds": 0.2
+        "seconds": 0.1
       },
       {
         "step": "rasterize land",
-        "seconds": 65.9
+        "seconds": 50.0
       },
       {
         "step": "rasterize lakes",
-        "seconds": 33.3
+        "seconds": 26.9
       },
       {
         "step": "overviews",
-        "seconds": 37.4
+        "seconds": 26.9
       },
       {
         "step": "tile",
-        "seconds": 222.2
+        "seconds": 265.0
+      },
+      {
+        "step": "dedupe",
+        "seconds": 148.6
       }
     ]
+  },
+  "deduplication": {
+    "method": "identical tiles hard-linked to one copy (scripts/dedupe_tiles.py)",
+    "distinct_tiles": 35409,
+    "disk_mb_before": 620,
+    "disk_mb_after": 150
   },
   "output": {
     "path": "public/tiles/grey/{z}/{x}/{y}.png",

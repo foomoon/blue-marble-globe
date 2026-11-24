@@ -19,32 +19,30 @@ A clean CesiumJS globe on self-hosted NASA Blue Marble tiles. It needs no API ke
 
 ## Quick start
 
-Requirements: Node 26 (`nvm install` reads .nvmrc), Python 3.11+, GDAL 3.6+ with WebP (3.9+ builds Blue Marble faster), and Docker for the map server. **`npm run doctor`** checks all of them and says how to fix what's missing.
-
-**Ubuntu 24.04:** one script installs everything from Ubuntu's own packages, then runs the doctor. For Node, it uses a Node 26 that's already installed; otherwise it installs nvm (or uses yours) and Node 26 through it, saying which and why. It's tested in a clean Ubuntu 24.04:
-
-```bash
-scripts/setup-ubuntu.sh            # everything; --server: only what the map server needs; --tests: test browsers too
-source ~/.nvm/nvm.sh               # only if it installed Node through nvm (it says so): or open a new terminal
-```
-
-**macOS:** `brew install gdal node`, then `nvm install`, then the `.venv` steps under *Higher-resolution regions*.
-
-Then:
+Requirements: **Docker** and **Node 26** (`nvm install` reads .nvmrc). All the map building runs inside the map server's **builder** container, whose GDAL, Python and numpy are pinned in `mapserver/builder/Dockerfile`, so every machine builds with exactly the same tools and nothing else needs installing.
 
 ```bash
 npm install
-npm run fetch:source   # ~3 GB from NASA, checksums verified against provenance/sources.json
-npm run build:tiles    # Blue Marble: ~156 MB of WebP tiles into public/tiles/blue-marble-webp/, zoom 0-8 (--format jpeg for JPEG)
-npm run build:grey     # optional: the Grey base map (~6 min, ~150 MB on disk)
-npm run build:terrain  # optional: global terrain from NOAA (5.2 GB download, ~13 min: 8½ to download, 4 to build; needs .venv)
+npm run maps             # builds all the map data in the builder container (about an hour, mostly downloading ~8 GB)
 npm run server:password  # in a terminal: choose the admin login (for adding regions)
-npm run server:up      # build and start the map server (Docker): the globe, the admin page, the layers
+npm run server:up        # start the map server: the globe, the admin page, the layers
 ```
 
-Then open http://localhost:8080/globe/. **Working on the app's code?** `npm run dev` runs it from source with instant reload, at http://localhost:5173, Regions panel included.
+Then open http://localhost:8080/globe/.
 
-The vector layers (borders, states, coastlines) are already in the repo; `npm run fetch:vectors` regenerates them. **[docs/building-the-tiles.md](docs/building-the-tiles.md)** explains every build step, and is also the Guide's "Build the map data" tab.
+`npm run maps` runs these steps in order, skipping any that's already built, so you can stop it and run it again to carry on:
+
+| Step | What it makes | Time, size |
+| --- | --- | --- |
+| `vectors` | borders, states, coastlines | already in the repo: skipped |
+| `tiles` | Blue Marble: downloads NASA's files (~3 GB, checksums verified), builds the WebP tiles | ~156 MB of tiles |
+| `grey` | the Grey base map | ~9 min, ~150 MB on disk |
+| `terrain` | global terrain: downloads NOAA ETOPO (5.2 GB), builds the tiles | ~15 min |
+| `catalog` | the map server's catalog | a second |
+
+`npm run maps -- --list` shows what's built; `--only grey` (or `--only tiles,terrain`) runs particular steps; `--force` rebuilds. The downloads stay in `data/source/`, so a rebuild doesn't fetch them again. **[docs/building-the-tiles.md](docs/building-the-tiles.md)** explains every step, and is also the Guide's "Build the map data" tab.
+
+**Working on the app's code?** `npm run dev` runs it from source with instant reload, at http://localhost:5173, Regions panel included. **Building outside Docker** (each step is a script: `npm run build:tiles`, `build:grey`, `build:terrain`, ...) needs Python 3.11+, GDAL 3.6+ with WebP, and numpy on your machine: `npm run doctor` checks them, `scripts/setup-ubuntu.sh` installs them on Ubuntu 24.04, and on macOS `brew install gdal` plus the `.venv` steps under *Higher-resolution regions*.
 
 `npm run verify:tiles` re-hashes the tiles and checks them against `provenance/build.json`.
 
@@ -113,8 +111,8 @@ The **Guide** button opens the project's own docs inside the app: *Build the map
 Blue Marble is 500 m per pixel. For a sharper view of a particular place, draw a **region** and the app builds a **30 m Landsat 8/9 layer** for it on your machine: sixteen times sharper, from free public-domain USGS imagery. **Where:** the map server's admin page, **http://localhost:8080/admin/**. Sign in, then press **Regions** (top left). Builds run in the map server's builder container, so nothing but Docker is needed; a finished region appears straight away on the globe (`/globe/`), on the admin page, and in the map server's catalog for other web maps.
 
 <p>
-  <img src="docs/images/regions-studio.jpg" width="49%" alt="The Regions panel with saved regions, over Guam">
-  <img src="docs/images/region-guam.jpg" width="49%" alt="Guam as a 30 m Landsat layer over the 500 m Blue Marble">
+  <img src="docs/images/regions-studio.jpg" width="49%" alt="The Regions panel with saved regions, over part of the Grand Canyon">
+  <img src="docs/images/region-4-done.jpg" width="49%" alt="Part of the Grand Canyon as a 30 m Landsat layer over the 500 m Blue Marble">
 </p>
 
 ### Before you start (once)
@@ -152,13 +150,13 @@ When you finish drawing, a form opens. Its tile table updates as you change the 
 | **Name** | The file name: `regions/<name>.json`, `public/tiles/landsat/<name>/` | Lowercase letters, numbers and dashes |
 | **Title** | What the Layers menu shows | |
 | **From / To** | Which dates' scenes to consider | June 2023 to September 2024. A longer range finds more clear views. |
-| **Months** | Which months within that range | June to September: summer, mostly cloud-free and green in the northern mid-latitudes. In the tropics, or wherever it's cloudy year-round, select every month (Guam does). |
+| **Months** | Which months within that range | June to September: summer, mostly cloud-free and green in the northern mid-latitudes. In the tropics, or wherever it's cloudy year-round, select every month. |
 | **Max cloud %** | Skips scenes cloudier than this overall | 20. Clouds in the scenes that are kept get masked out pixel by pixel. |
 | **Scenes/spot** | How many of the clearest scenes to combine for each Landsat footprint. Each pixel is the median of its clear views. | 4. More fills more cloud gaps and evens out colour, but downloads more. |
 | **Zoom … to** | The zoom levels to build | 8 to 12. Zoom 12 is Landsat's full 30 m. The layer only shows from its first zoom inward; each zoom level out you add costs few tiles. |
-| **Terrain** | Builds detailed terrain for the region too | On. USGS 3DEP at 10 m in the US (including Alaska, Hawaii and territories such as Guam), NASADEM at 30 m elsewhere between 60° N and 56° S. Beyond those, the region uses the global terrain. Adds about a minute and a few MB. |
+| **Terrain** | Builds detailed terrain for the region too | On. USGS 3DEP at 10 m in the US (including Alaska, Hawaii and the territories), NASADEM at 30 m elsewhere between 60° N and 56° S. Beyond those, the region uses the global terrain. Adds about a minute and a few MB. |
 
-**Keep regions modest.** Build time and scratch disk grow with the area. The 714 km² demo above built in about 20 seconds, and Guam in 42. A national park or a metro area is fine. A whole state takes hours. Something the size of the continental US can't be built yet; it needs chunked builds, which are on the backlog.
+**Keep regions modest.** Build time and scratch disk grow with the area. The 714 km² demo above built in under a minute (20 to 45 seconds, mostly reading the imagery), and Mount Everest in 25. A national park or a metro area is fine. A whole state takes hours. Something the size of the continental US can't be built yet; it needs chunked builds, which are on the backlog.
 
 ### 3. Save & build
 
@@ -186,7 +184,7 @@ When the build finishes, the region appears on the globe automatically, here as 
   - `regions/<name>.json`: the config. Commit it.
   - `provenance/regions/<name>.json`: the record of every Landsat scene used, with its URLs, ETags and sizes, plus the timings and a digest of the tiles. Commit it.
   - `public/tiles/landsat/<name>/`: the tiles, with the region's terrain in `terrain/`. Gitignored, and rebuildable from the config.
-- **Its terrain** takes over from the global terrain inside the region while the region is switched on. The readout then names it: `USGS 3DEP · ≈10 m detail` (Mount Lamlam, Guam's summit, reads 401 m against 334 m on the global terrain, whose 600 m averages flatten it; the real height is about 406 m).
+- **Its terrain** takes over from the global terrain inside the region while the region is switched on. The readout then names it: `USGS 3DEP · ≈10 m detail` (Everest's summit reads about 8,770 m against 8,490 m on the global terrain, whose 600 m averages flatten it; the surveyed height is 8,849 m, and NASADEM's 30 m cells still round the very top off).
 
 ### Managing regions
 
@@ -210,10 +208,14 @@ Terrain: `scripts/region_terrain.py`. It searches 3DEP and NASADEM, then reads t
 ```
 src/main.js                 the whole app: one imagery layer on a bare viewer
 src/guide.js                in-app Guide panel (renders docs/*.md: building, adding layers, map server)
-src/studio/                 dev-only Regions panel: drawing, tile estimates
-server/studio.js            dev-only API: saves regions/*.json, runs and streams builds
+src/studio/                 Regions panel (dev server and admin page): drawing, tile estimates
+src/datasource.js           the Server status light
+server/studio-api.js        Regions API: saves regions/*.json, runs and streams builds
+server/studio.js            ... plugged into the dev server (npm run dev)
+server/admin-api.js         ... and the builder container's own server, with sign-in (server/auth.js)
 scripts/build_region.py     Landsat region build (search, read, composite, tile)
 regions/                    saved region configs
+scripts/build_maps.py       every map build step in order (npm run maps, in the builder container)
 scripts/fetch_source.py     download the NASA GeoTIFFs and record their checksums
 scripts/build_tiles.py      reproject and tile with GDAL, recording every command
 provenance/sources.json     NASA URLs + SHA-256 of the exact source bytes
@@ -228,10 +230,14 @@ src/terrain.js              turns the terrain tiles into Cesium terrain
 provenance/terrain.json     terrain sources (288 files' checksums), encoding, timings, tile digest
 provenance/grey.json        Grey map sources, checksums, commands, timings, tile digest
 scripts/build_server.py     map server catalog, TileJSON and index page (-> mapserver/www/)
-scripts/setup-ubuntu.sh     installs everything on Ubuntu 24.04, then runs the doctor
-scripts/doctor.py           checks every dependency and version (npm run doctor)
-mapserver/                  map server container: nginx config, Dockerfile
-compose.yaml                runs the map server (npm run server:up)
+scripts/dedupe_tiles.py     stores identical tiles once (hard links, at most 60,000 per copy)
+scripts/admin-password.sh   sets the admin login (npm run server:password)
+scripts/make-cert.sh        HTTPS certificate from a private CA (npm run server:cert)
+scripts/bundle.sh           offline bundle for air-gapped networks (npm run bundle)
+scripts/setup-ubuntu.sh     building outside Docker: installs everything on Ubuntu 24.04
+scripts/doctor.py           building outside Docker: checks every dependency (npm run doctor)
+mapserver/                  map server containers: nginx config, builder, sign-in page, offline bundle files
+compose.yaml                runs the map server and builder (npm run server:up)
 scripts/screenshots.mjs     regenerates the README screenshots in docs/images/ (npm run screenshots [-- --regions])
 LICENSING.md                terms, quotes and conditions, with links
 NOTICE                      attribution for redistribution
@@ -245,7 +251,7 @@ Serves the layers you've built to **any web map** (Leaflet, MapLibre, OpenLayers
 
 ```bash
 npm run server:up      # write the catalog, build the image, start on http://localhost:8080
-npm run test:server    # check it end to end (6 tests)
+npm run test:server    # check it end to end (MAPSERVER_ADMIN=user:password to include the signed-in tests)
 npm run server:down    # stop it
 npm run server:build   # refresh the catalog by hand (every build already does it when it finishes)
 ```
@@ -270,7 +276,7 @@ map.addSource("grey", { type: "raster", url: "http://localhost:8080/tiles/grey/t
 map.addLayer({ id: "grey", type: "raster", source: "grey" });
 ```
 
-**The map server serves the globe too**, at **http://localhost:8080/globe/** (linked from its home page): the same app, on the same address as its data, so it needs no settings and no cross-origin rules, and anyone who can reach the server can use it. `npm run server:up` builds it (`npm run server:globe` on its own: a production build into `mapserver/globe/`, without the tiles, which the server already has). Its label says **Data: this server**. It's the viewer only: the Regions panel stays in `npm run dev`.
+**The map server serves the globe too**, at **http://localhost:8080/globe/** (linked from its home page): the same app, on the same address as its data, so it needs no settings and no cross-origin rules, and anyone who can reach the server can use it. `npm run server:up` builds it (`npm run server:globe` on its own: a production build into `mapserver/globe/`, without the tiles, which the server already has). It's the viewer only, with an **Admin** pill (top left) leading to the admin page.
 
 **The admin page** is the globe plus the **Regions** panel, at **http://localhost:8080/admin/**, behind the app's own sign-in page. Region builds started there run in a second container, the **builder** (GDAL 3.13.3, Python, numpy and Node, from OSGeo's official image), so the map server's machine needs nothing but Docker:
 
@@ -285,6 +291,8 @@ npm run server:up         # builds the globe, the admin page and both images, th
 - **Finished regions appear straight away** on the globe, the admin page, the home page and the catalog.
 - **Images:** builder about 820 MB, map server about 90 MB. A machine that only serves maps can run just the map server.
 
+**HTTPS and air-gapped networks.** Put a certificate in `mapserver/tls/` and the server switches to HTTPS (`npm run server:cert` makes one from a private CA, for networks without their own). For a network without internet, `npm run bundle` packs the server and all the map data into one folder; its `install.sh` installs or updates a **serve-only** server (no admin page) with nothing but Docker, after checking every file's checksum. See [docs/map-server.md](docs/map-server.md), sections 6 and 7.
+
 **A separately run globe can use the server too.** By default the globe loads map data from its own site. Start or build it with the server's address, and it takes all of it (tiles, terrain, regions, lines) from the map server instead:
 
 ```bash
@@ -293,11 +301,11 @@ VITE_MAP_SERVER_URL=http://localhost:8080 npm run dev      # or ... npm run buil
 
 To make it stick on your machine, put the setting in `.env.local` (not committed; `.env.example` shows it), and restart `npm run dev`. Delete the file, or empty the value, to go back to local files. The tests always run on local files, whatever `.env.local` says.
 
-A label under the **Layers** and **Guide** buttons says where the data is coming from: **Data: local**, or **Data: map server**, with a green dot while the server answers its health check and red when it doesn't. Hover over it for the address.
+A **Server** light under the **Layers** and **Guide** buttons shows whether the map server is answering: green, or red with **Server offline**. It follows the data requests themselves, plus a health check every 30 s. Hover over it for the address. A globe reading its own files has no light.
 
 **How it works.** `scripts/build_server.py` reads the provenance records and writes the catalog, TileJSON and index page to `mapserver/www/` (gitignored). The container is plain nginx (`mapserver/`). The tiles, vectors and provenance are **mounted read-only, not copied**, so the image stays tiny and a rebuilt layer is live straight away. Any site may load the layers (CORS `*`, including Chrome's private-network preflight for LAN use). Tiles are cached for a day, and metadata is always revalidated.
 
-**Addresses.** URLs in the catalog and TileJSON are absolute, built from whatever address a client used (`localhost`, a LAN IP, a hostname). Behind a reverse proxy or CDN, publish one fixed address instead with `python3 scripts/build_server.py --base-url https://maps.example.com`. The proxy terminates TLS; the server honours `X-Forwarded-Proto`.
+**Addresses.** URLs in the catalog and TileJSON are absolute, built from whatever address a client used (`localhost`, a LAN IP, a hostname). Behind a reverse proxy or CDN, publish one fixed address instead with `python3 scripts/build_server.py --base-url https://maps.example.com`. The proxy terminates TLS; the server honours `X-Forwarded-Proto`. (Or let the server do HTTPS itself: see above.)
 
 **Note:** Chrome won't let a page on the public internet load from `localhost` or a private IP, whatever the server allows. For a public site, host the server at a public address.
 

@@ -19,11 +19,16 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import sys
 from collections import defaultdict
 from pathlib import Path
 
 TILE_SUFFIXES = {".png", ".jpg", ".webp"}
+# At most this many names per stored copy: Linux's ext4 allows 65,000 hard links to a file (macOS
+# allows 65,535), so a tile repeated more often than this gets a second copy, and so on. Otherwise
+# the tiles couldn't be copied or unpacked onto an ext4 disk (an offline bundle, rsync -H).
+MAX_LINKS = 60_000
 
 
 def disk_bytes(root: Path) -> int:
@@ -54,15 +59,23 @@ def dedupe(root: Path) -> dict:
         for p in paths:
             by_hash[hashlib.sha256(p.read_bytes()).hexdigest()].append(p)
         for same in by_hash.values():
-            keep = same[0].stat()
-            for p in same[1:]:
-                st = p.stat()
-                if (st.st_dev, st.st_ino) == (keep.st_dev, keep.st_ino):
-                    continue  # already linked
-                tmp = p.with_name(p.name + ".link")
-                os.link(same[0], tmp)
-                os.replace(tmp, p)  # atomic: readers see the old or the new file, never neither
-                linked += 1
+            for start in range(0, len(same), MAX_LINKS):
+                group = same[start:start + MAX_LINKS]
+                lead = group[0]
+                if start and lead.stat().st_nlink > 1:
+                    # a later group starts from its own copy, not another link to the first one
+                    tmp = lead.with_name(lead.name + ".copy")
+                    shutil.copy2(lead, tmp)
+                    os.replace(tmp, lead)
+                keep = lead.stat()
+                for p in group[1:]:
+                    st = p.stat()
+                    if (st.st_dev, st.st_ino) == (keep.st_dev, keep.st_ino):
+                        continue  # already linked
+                    tmp = p.with_name(p.name + ".link")
+                    os.link(lead, tmp)
+                    os.replace(tmp, p)  # atomic: readers see the old or the new file, never neither
+                    linked += 1
     unique = len({(p.stat().st_dev, p.stat().st_ino) for v in by_size.values() for p in v})
     return {"files": files, "unique": unique, "newly_linked": linked,
             "disk_before": before, "disk_after": disk_bytes(root)}

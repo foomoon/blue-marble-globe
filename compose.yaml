@@ -8,11 +8,15 @@ services:
     image: blue-marble-globe/mapserver
     ports:
       - "${MAPSERVER_PORT:-8080}:8080"
+      - "${MAPSERVER_HTTPS_PORT:-8443}:8443"   # HTTPS, when there's a certificate in mapserver/tls/
+    environment:
+      MAPSERVER_HTTPS_PORT: ${MAPSERVER_HTTPS_PORT:-8443}  # where plain HTTP is redirected
     volumes:
       - ./mapserver/www:/srv/www:ro          # catalog, TileJSON, index (scripts/build_server.py)
       - ./mapserver/globe:/srv/globe:ro      # the globe, at /globe/ (npm run server:globe)
       - ./mapserver/admin:/srv/admin:ro      # the admin page, at /admin/ (npm run server:admin)
       - ./mapserver/login:/srv/login:ro      # its sign-in page, at /login/
+      - ./mapserver/tls:/etc/nginx/tls:ro    # HTTPS certificate, if any (npm run server:cert)
       - ./public/tiles:/srv/tiles:ro         # Blue Marble, Grey, Landsat regions
       - ./public/vectors:/srv/vectors:ro     # GeoJSON layers
       - ./provenance:/srv/provenance:ro      # checksums, build records, archived terms

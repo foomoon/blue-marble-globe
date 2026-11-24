@@ -92,9 +92,13 @@ if (import.meta.env.DEV || import.meta.env.VITE_ADMIN === "1") {
   import("./studio/studio.js").then(({ mountStudio }) => mountStudio(viewer, layers));
 }
 // The public globe the map server serves (/globe/): where the Regions button would be, a link to
-// the admin page, where regions are added (it asks you to sign in).
+// the admin page, where regions are added (it asks you to sign in). Only when this server has one:
+// a serve-only server (MAPSERVER_ADMIN=off, e.g. on an air-gapped network) has no sign-in page.
 else if (servedByMapServer) {
-  const admin = Object.assign(document.createElement("a"), { className: "admin-link", href: "../admin/", textContent: "Admin" });
-  admin.title = "Add and build high-resolution regions (sign-in required)";
-  document.body.append(admin);
+  fetch("../login/", { method: "HEAD" }).then((res) => {
+    if (!res.ok) return;
+    const admin = Object.assign(document.createElement("a"), { className: "admin-link", href: "../admin/", textContent: "Admin" });
+    admin.title = "Add and build high-resolution regions (sign-in required)";
+    document.body.append(admin);
+  }, () => {});
 }

@@ -208,6 +208,7 @@ def make_tiles(fmt: str, gdal2tiles: str, merc: Path) -> tuple[dict, str]:
     if fmt == "webp":
         # WebP tiles: GDAL 3.6+, so this works directly on Ubuntu 24.04's GDAL 3.8 too
         run("tile (WebP)", base + ["--tiledriver=WEBP", f"--webp-quality={WEBP_QUALITY}", str(merc), str(out)])
+        make_readable(out)
         note = f"WebP encoding (lossy), quality {WEBP_QUALITY}"
     elif jpeg_tiles_supported(gdal2tiles):
         run("tile (JPEG)", base + ["--tiledriver=JPEG", f"--jpeg-quality={JPEG_QUALITY}", str(merc), str(out)])
@@ -234,6 +235,13 @@ def make_tiles(fmt: str, gdal2tiles: str, merc: Path) -> tuple[dict, str]:
         "tiles_sha256_method": f"sha256 of the sorted lines '<z/x/y.{ext}> <sha256 of file>', joined by \\n",
     }, note
 
+
+
+def make_readable(root: Path) -> None:
+    """gdal2tiles' WebP driver writes tiles readable only by their owner (0600). Tiles are public
+    data, served by nginx as another user: on Linux it couldn't read them. Files 644, folders 755."""
+    for p in root.rglob("*"):
+        os.chmod(p, 0o755 if p.is_dir() else 0o644)
 
 def main() -> None:
     ap = argparse.ArgumentParser()

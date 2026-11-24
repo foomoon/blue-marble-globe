@@ -211,7 +211,7 @@ test.describe("admin page (signed in)", () => {
     await expect(page).toHaveURL(url("/admin/"));
     await page.getByRole("button", { name: "Regions" }).click();
     await expect(page.locator(".studio-badge")).toHaveText("admin");
-    await expect(page.locator(".studio-list")).toContainText("Guam");
+    await expect(page.locator(".studio-list")).toContainText("Mount Everest");
     await expect(page.locator(".data-source")).toHaveText("Server");
     expect([...origins]).toEqual([new URL(BASE).origin]);
     await page.getByRole("button", { name: "Sign out" }).click();

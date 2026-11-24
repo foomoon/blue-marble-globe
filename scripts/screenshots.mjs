@@ -8,9 +8,12 @@
 //                                       ~2 min), then deletes it again
 //   npm run screenshots -- --regions-only   just the region walkthrough
 //
-// Needs the Blue Marble, Grey and terrain tiles built, and the Guam region for its shots.
+// Needs the Blue Marble, Grey and terrain tiles built.
+//
+// Only regions committed to git appear: any other region on this machine (kept local, e.g. via
+// .git/info/exclude) is hidden from the layer list, the Regions panel and the map server page.
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { chromium } from "@playwright/test";
 
 const APP = process.env.APP_URL ?? "http://localhost:5173";
@@ -20,9 +23,34 @@ mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 
+// Regions on this machine that aren't in git: never shown in the screenshots
+const committed = new Set(execFileSync("git", ["ls-files", "regions"], { encoding: "utf8" }).split("\n"));
+const HIDDEN = readdirSync("regions")
+  .filter((f) => f.endsWith(".json") && !committed.has(`regions/${f}`))
+  .map((f) => f.replace(/\.json$/, ""));
+if (HIDDEN.length) console.log(`  (not shown: ${HIDDEN.length} local-only region(s))`);
+
+/** Leave the local-only regions out of everything this page loads. */
+async function hideLocalRegions(page) {
+  if (!HIDDEN.length) return;
+  const keep = (r) => !HIDDEN.includes(r.name);
+  // Matched on the path: the layer list asks for index.json?t=<time>
+  for (const path of ["/tiles/landsat/index.json", "/api/regions"]) {
+    await page.route((url) => url.pathname === path, async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      const res = await route.fetch();
+      const body = await res.json();
+      body.regions = body.regions.filter(keep);
+      await route.fulfill({ response: res, json: body });
+    });
+  }
+  await page.route((url) => HIDDEN.some((n) => url.pathname.startsWith(`/tiles/landsat/${n}/`)), (r) => r.abort());
+}
+
 /** Open the app with given layer choices and camera view, the dev Regions button hidden. */
 async function app(prefs, view) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await hideLocalRegions(page);
   await page.addInitScript((p) => localStorage.setItem("layers", JSON.stringify(p)), prefs);
   await page.goto(APP);
   await page.addStyleTag({ content: ".studio-toggle { display: none !important; }" });
@@ -93,21 +121,23 @@ await page.waitForTimeout(400);
 await shot(page, "guide");
 await page.close();
 
-// 5. A Landsat region (Guam) over Blue Marble, and the dev Regions studio beside it
-page = await app({ base: "blue-marble", ...lines }, [144.79, 13.45, 75_000]);
-await shot(page, "region-guam");
-await page.evaluate(() => document.querySelector(".studio-toggle").style.setProperty("display", "block", "important"));
-await page.getByRole("button", { name: "Regions" }).click();
-await page.waitForTimeout(800);
-await settle(page);
-await shot(page, "regions-studio");
-await page.close();
+// (5. The Regions panel and a finished region are shot in the walkthrough, over its demo region)
 
 // 6. The map server's index page
 page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 try {
+  await hideLocalRegions(page);
   await page.goto(SERVER, { timeout: 3000 });
   await page.waitForLoadState("networkidle");
+  // The page is static HTML: drop the local-only regions' entries, and count the rest
+  await page.evaluate((hidden) => {
+    const articles = [...document.querySelectorAll("article")];
+    for (const a of articles) {
+      if (hidden.some((n) => a.querySelector("code")?.textContent.startsWith(`landsat/${n}`))) a.remove();
+    }
+    const p = [...document.querySelectorAll("p")].find((el) => /\d+ layers, built/.test(el.textContent));
+    if (p) p.innerHTML = p.innerHTML.replace(/\d+ layers/, `${document.querySelectorAll("article").length} layers`);
+  }, HIDDEN);
   await shot(page, "map-server");
 } catch {
   console.log(`  (map server not running at ${SERVER}: skipped map-server.jpg)`);
@@ -190,6 +220,12 @@ async function regionWalkthrough() {
     await done.waitForFunction(() => document.querySelector(".coords-terrain")?.textContent.includes("3DEP"), null, { timeout: 60_000 });
     await settle(done);
     await shot(done, "region-4-done");
+    // The Regions panel beside it, listing the saved regions
+    await done.evaluate(() => document.querySelector(".studio-toggle").style.setProperty("display", "block", "important"));
+    await done.getByRole("button", { name: "Regions" }).click();
+    await done.waitForTimeout(800);
+    await settle(done);
+    await shot(done, "regions-studio");
     await done.close();
   } finally {
     cleanup();

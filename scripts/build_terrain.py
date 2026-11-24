@@ -175,7 +175,7 @@ def halve(a):
 def horizontal(path):
     """The source's horizontal reference only. ETOPO declares "WGS 84 + EGM2008 height"; given
     that, GDAL converts the heights to the WGS84 ellipsoid on reprojection, adding the geoid
-    height (+55 m at Guam, -106 to +85 m worldwide). Heights must stay above sea level, as the
+    height (+64 m in Iceland, -106 to +85 m worldwide). Heights must stay above sea level, as the
     globe and the regional terrain take them."""
     from osgeo import gdal
     srs = gdal.Open(path).GetSpatialRef().Clone()
