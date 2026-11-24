@@ -23,7 +23,7 @@ Requirements: **Docker** and **Node 26** (`nvm install` reads .nvmrc). All the m
 
 ```bash
 npm install
-npm run maps             # builds all the map data in the builder container (about an hour, mostly downloading ~8 GB)
+npm run maps             # builds all the map data in the builder container (~30-40 min: ~8.5 GB to download, the rest building)
 npm run server:password  # in a terminal: choose the admin login (for adding regions)
 npm run server:up        # start the map server: the globe, the admin page, the layers
 ```
@@ -35,10 +35,12 @@ Then open http://localhost:8080/globe/.
 | Step | What it makes | Time, size |
 | --- | --- | --- |
 | `vectors` | borders, states, coastlines | already in the repo: skipped |
-| `tiles` | Blue Marble: downloads NASA's files (~3 GB, checksums verified), builds the WebP tiles | ~156 MB of tiles |
-| `grey` | the Grey base map | ~9 min, ~150 MB on disk |
-| `terrain` | global terrain: downloads NOAA ETOPO (5.2 GB), builds the tiles | ~15 min |
+| `tiles` | Blue Marble: downloads NASA's files (~3 GB, checksums verified), builds the WebP tiles | ~2 min download, ~11 min build; 156 MB of tiles (~400 MB on disk) |
+| `grey` | the Grey base map | 6-9 min; ~150 MB on disk |
+| `terrain` | global terrain: downloads NOAA ETOPO (5.2 GB), builds the tiles | ~8½ min download, ~4 min build; ~900 MB on disk |
 | `catalog` | the map server's catalog | a second |
+
+Times are from this project's own build records, on an Apple-silicon Mac with a fast connection (NASA served ~25 MB/s): download time depends on your connection (8.5 GB is ~11 min at 100 Mbit/s). In the builder container on macOS, building runs slower than natively (Grey: 9 min instead of 6) because of its 4-CPU cap and Docker's slow writes to the project folder; on a Linux host it's about the native speed.
 
 `npm run maps -- --list` shows what's built; `--only grey` (or `--only tiles,terrain`) runs particular steps; `--force` rebuilds. The downloads stay in `data/source/`, so a rebuild doesn't fetch them again. **[docs/building-the-tiles.md](docs/building-the-tiles.md)** explains every step, and is also the Guide's "Build the map data" tab.
 
