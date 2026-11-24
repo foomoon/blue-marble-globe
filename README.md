@@ -11,7 +11,18 @@ A clean CesiumJS globe on self-hosted NASA Blue Marble tiles. It needs no API ke
 
 ## Quick start
 
-Requirements: Node 26 LTS (`nvm use` reads .nvmrc), Python 3.9+, GDAL 3.9+ (`brew install gdal` on macOS).
+Requirements: Node 26 (`nvm install` reads .nvmrc), Python 3.11+, GDAL 3.6+ with WebP (3.9+ builds Blue Marble faster), and Docker for the map server. **`npm run doctor`** checks all of them and says how to fix what's missing.
+
+**Ubuntu 24.04:** one script installs everything from Ubuntu's own packages, then runs the doctor. For Node, it uses a Node 26 that's already installed; otherwise it installs nvm (or uses yours) and Node 26 through it, saying which and why. It's tested in a clean Ubuntu 24.04:
+
+```bash
+scripts/setup-ubuntu.sh            # everything; --server: only what the map server needs; --tests: test browsers too
+source ~/.nvm/nvm.sh               # only if it installed Node through nvm (it says so): or open a new terminal
+```
+
+**macOS:** `brew install gdal node`, then `nvm install`, then the `.venv` steps under *Higher-resolution regions*.
+
+Then:
 
 ```bash
 npm install
@@ -26,7 +37,7 @@ The vector layers (borders, states, coastlines) are already in the repo; `npm ru
 
 `npm run verify:tiles` re-hashes the tiles and checks them against `provenance/build.json`.
 
-`npm test` runs the Playwright browser tests (first time: `npx playwright install chromium`):
+`npm test` runs the Playwright browser tests (first time: `npx playwright install chromium`; on Ubuntu, `scripts/setup-ubuntu.sh --tests` installs it with its system libraries):
 - the production globe makes **no requests outside its own origin**
 - NASA's credit and terms link are on screen, and the Cesium ion logo isn't
 - the Guide panel works, and the dev-only Regions studio is absent from the build
@@ -97,7 +108,7 @@ Blue Marble is 500 m per pixel. For a sharper view of a particular place, draw a
 
 ### Before you start (once)
 
-Region builds use Python with numpy, in the project's own virtual environment (Homebrew's numpy can be broken, so the project doesn't rely on it):
+Region and terrain builds use Python with GDAL's bindings and numpy, in the project's own virtual environment. On **Ubuntu**, `scripts/setup-ubuntu.sh` creates it, using Ubuntu's `python3-gdal` and `python3-numpy`. Don't pip-install numpy into it there: GDAL's bindings are built against Ubuntu's numpy. On **macOS** (Homebrew's numpy can be broken, so the project brings its own):
 
 ```bash
 python3 -m venv --system-site-packages .venv   # keeps access to GDAL's Python bindings
@@ -204,6 +215,8 @@ src/terrain.js              turns the terrain tiles into Cesium terrain
 provenance/terrain.json     terrain sources (288 files' checksums), encoding, timings, tile digest
 provenance/grey.json        Grey map sources, checksums, commands, timings, tile digest
 scripts/build_server.py     map server catalog, TileJSON and index page (-> mapserver/www/)
+scripts/setup-ubuntu.sh     installs everything on Ubuntu 24.04, then runs the doctor
+scripts/doctor.py           checks every dependency and version (npm run doctor)
 mapserver/                  map server container: nginx config, Dockerfile
 compose.yaml                runs the map server (npm run server:up)
 scripts/screenshots.mjs     regenerates the README screenshots in docs/images/ (npm run screenshots [-- --regions])

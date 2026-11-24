@@ -104,7 +104,7 @@ def build(layer: dict, previous: dict | None) -> dict:
 
     out = OUT_DIR / f"{layer['name']}.geojson"
     out.unlink(missing_ok=True)
-    cmd = ["ogr2ogr", "-f", "GeoJSON", "-a_srs", "EPSG:4326", "-lco", "RFC7946=YES", "-lco", "COORDINATE_PRECISION=4",
+    cmd = ["ogr2ogr", "-f", "GeoJSON", "-a_srs", "EPSG:4326", "-lco", "RFC7946=YES", "-lco", "COORDINATE_PRECISION=15",
            "-dialect", "SQLite", "-sql", " ".join(layer["sql"].format(src=src_name).split()),
            str(out), f"/vsizip/{zip_path}/{src_name}.shp"]
     subprocess.run(cmd, check=True)
@@ -114,6 +114,7 @@ def build(layer: dict, previous: dict | None) -> dict:
     if not feats or empty:
         out.unlink()
         sys.exit(f"{layer['name']}: {empty} of {len(feats)} features have no geometry; refusing to write it.")
+    normalise(out, feats)
 
     print(f"{layer['name']}: {len(feats)} lines -> {out.relative_to(ROOT)} ({out.stat().st_size / 1e3:.0f} KB), Natural Earth {version}")
     return {
@@ -132,14 +133,36 @@ def build(layer: dict, previous: dict | None) -> dict:
             "retrieved_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         },
         "conversion": [a if not a.startswith(str(ROOT)) else str(Path(a).relative_to(ROOT)) for a in cmd],
+        "post_processing": f"coordinates rounded to {DECIMALS} decimals (round half to even) and written in one fixed "
+                           "layout by scripts/fetch_vectors.py, so the output is the same with any GDAL version",
         "output": {"path": str(out.relative_to(ROOT)), "features": len(feats),
                    "bytes": out.stat().st_size, "sha256": sha256(out)},
     }
 
 
+DECIMALS = 4  # about 11 m: plenty at 1:50m
+
+
+def rounded(c):
+    """Coordinates to DECIMALS places, round half to even (+ 0.0 turns -0.0 into 0.0)."""
+    return [rounded(v) for v in c] if isinstance(c, list) else round(c, DECIMALS) + 0.0
+
+
+def normalise(path: Path, features: list) -> None:
+    """Rewrite in one fixed form, so the bytes (and the checksum in provenance/vectors.json)
+    don't depend on the GDAL version. ogr2ogr writes full precision and this rounds: GDAL 3.8
+    (Ubuntu 24.04) and 3.13 round exact halves differently (117.40625 -> .4063 or .4062), pad
+    differently, and newer versions add a top-level "xy_coordinate_resolution". One feature per
+    line, so a changed line in git means a changed feature."""
+    for f in features:
+        f["geometry"]["coordinates"] = rounded(f["geometry"]["coordinates"])
+    lines = [json.dumps(f, separators=(",", ":"), ensure_ascii=False) for f in features]
+    path.write_text('{"type":"FeatureCollection","features":[\n' + ",\n".join(lines) + "\n]}\n", encoding="utf-8")
+
+
 def main() -> None:
     if not shutil.which("ogr2ogr"):
-        sys.exit("Missing ogr2ogr. Install GDAL (macOS: brew install gdal).")
+        sys.exit("Missing ogr2ogr. Install GDAL (Ubuntu: sudo apt install gdal-bin python3-gdal; macOS: brew install gdal). npm run doctor checks everything.")
     SRC_DIR.mkdir(parents=True, exist_ok=True)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     records = load_records()

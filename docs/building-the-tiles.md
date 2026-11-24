@@ -14,8 +14,9 @@ Tiles go in `public/tiles/` (gitignored, reproducible). The vector files are sma
 
 ## What you need
 
-- **Python 3.9+**, standard library only. Landsat regions also need the project's `.venv`; see the README.
-- **GDAL 3.9+**, the open-source toolkit that does the reprojection, rasterising and tiling: `brew install gdal` on macOS, `apt install gdal-bin python3-gdal` on Debian/Ubuntu.
+- **Python 3.11+**. The Blue Marble, Grey and vector scripts use the standard library only; terrain and Landsat regions also need the project's `.venv` (see the README).
+- **GDAL 3.6+** with WebP, the open-source toolkit that does the reprojection, rasterising and tiling: `brew install gdal` on macOS, `sudo apt install gdal-bin python3-gdal` on Ubuntu (`scripts/setup-ubuntu.sh` installs everything). Before GDAL 3.9 (Ubuntu 24.04 has 3.8), `gdal2tiles` can't write JPEG, so the Blue Marble build writes PNG and converts each tile, which adds a couple of minutes.
+- `npm run doctor` checks all of it.
 - **Disk:** about 8 GB free while building Blue Marble (3.2 GB of source plus a 4 GB intermediate, deleted afterwards). Terrain needs 5.2 GB for NOAA's files (kept for rebuilds) plus about 0.9 GB of tiles, and no intermediate.
 
 ## Blue Marble

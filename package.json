@@ -6,6 +6,7 @@
   "description": "A clean Cesium globe on self-hosted NASA Blue Marble tiles, with full provenance.",
   "scripts": {
     "dev": "vite",
+    "doctor": "python3 -I scripts/doctor.py",
     "build": "vite build",
     "preview": "vite preview",
     "server:build": "python3 -I scripts/build_server.py",

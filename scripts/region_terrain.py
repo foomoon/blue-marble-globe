@@ -282,7 +282,9 @@ def build(cfg, area, dest: Path, work: Path, progress, cancelled, log):
     if not glob.ok:
         log("terrain: the global terrain isn't built, so the regional terrain isn't blended at its edges")
     ring = ogr.CreateGeometryFromWkb(area.ExportToWkb())
-    vec = ogr.GetDriverByName("MEM").CreateDataSource("")
+    # The in-memory vector driver is "MEM" from GDAL 3.11, "Memory" before (Ubuntu 24.04 has 3.8).
+    # Asking OGR, which lists vector drivers only, finds whichever this GDAL has.
+    vec = (ogr.GetDriverByName("MEM") or ogr.GetDriverByName("Memory")).CreateDataSource("")
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(3857)
     lyr = vec.CreateLayer("area", srs)

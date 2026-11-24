@@ -145,6 +145,15 @@ class Grid:
 
 # ---------------------------------------------------------------- region shape (Web Mercator)
 
+def memory_vector_driver():
+    """GDAL's in-memory driver for vector data: "MEM" from GDAL 3.11 (which deprecates the old
+    name), "Memory" before that (Ubuntu 24.04 has 3.8, where "MEM" is raster-only)."""
+    mem = gdal.GetDriverByName("MEM")
+    if mem and mem.GetMetadataItem(gdal.DCAP_VECTOR) == "YES":
+        return mem
+    return gdal.GetDriverByName("Memory")
+
+
 def merc_ring(points):
     ring = ogr.Geometry(ogr.wkbLinearRing)
     for lon, lat in [*points, points[0]]:
@@ -351,7 +360,7 @@ def composite(cfg, grid, scenes, work, path, area):
     if cfg.get("boundary"):
         # Everything outside the polygon becomes transparent, so Blue Marble shows there
         # (gdal.RasterizeLayer ignores INVERSE, so use gdal.Rasterize with a vector dataset)
-        mem = gdal.GetDriverByName("MEM").Create("", 0, 0, 0, gdal.GDT_Unknown)
+        mem = memory_vector_driver().Create("", 0, 0, 0, gdal.GDT_Unknown)
         layer = mem.CreateLayer("boundary", srs, ogr.wkbPolygon)
         feat = ogr.Feature(layer.GetLayerDefn())
         feat.SetGeometry(area)

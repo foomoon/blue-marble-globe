@@ -24,7 +24,7 @@
         "-lco",
         "RFC7946=YES",
         "-lco",
-        "COORDINATE_PRECISION=4",
+        "COORDINATE_PRECISION=15",
         "-dialect",
         "SQLite",
         "-sql",
@@ -32,11 +32,12 @@
         "public/vectors/country-borders.geojson",
         "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_50m_admin_0_boundary_lines_land.zip/ne_50m_admin_0_boundary_lines_land.shp"
       ],
+      "post_processing": "coordinates rounded to 4 decimals (round half to even) and written in one fixed layout by scripts/fetch_vectors.py, so the output is the same with any GDAL version",
       "output": {
         "path": "public/vectors/country-borders.geojson",
         "features": 390,
-        "bytes": 426093,
-        "sha256": "1fedef0809f3cdede10b389b9a4ccd424d723c3c9a0782abd71e8d7c6c40457e"
+        "bytes": 426034,
+        "sha256": "14273a29709ce0f6d02017f8e2d0a11f3f7816f96df45164ee54977f086543a8"
       }
     },
     "us-states": {
@@ -63,7 +64,7 @@
         "-lco",
         "RFC7946=YES",
         "-lco",
-        "COORDINATE_PRECISION=4",
+        "COORDINATE_PRECISION=15",
         "-dialect",
         "SQLite",
         "-sql",
@@ -71,11 +72,12 @@
         "public/vectors/us-states.geojson",
         "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_50m_admin_1_states_provinces_lines.zip/ne_50m_admin_1_states_provinces_lines.shp"
       ],
+      "post_processing": "coordinates rounded to 4 decimals (round half to even) and written in one fixed layout by scripts/fetch_vectors.py, so the output is the same with any GDAL version",
       "output": {
         "path": "public/vectors/us-states.geojson",
         "features": 125,
-        "bytes": 66210,
-        "sha256": "db76fb63412ae3d5d2231ddcaa4eb15a6b90eb9ea6005c82dbe0345ab860a1a5"
+        "bytes": 66151,
+        "sha256": "e5f60744857ee6a03994d89b305b213efbfe5e32f74860742df52d2bf3c136dc"
       }
     },
     "coastlines": {
@@ -102,7 +104,7 @@
         "-lco",
         "RFC7946=YES",
         "-lco",
-        "COORDINATE_PRECISION=4",
+        "COORDINATE_PRECISION=15",
         "-dialect",
         "SQLite",
         "-sql",
@@ -110,11 +112,12 @@
         "public/vectors/coastlines.geojson",
         "/vsizip//Users/daniel/Documents/Projects/Code/blue-marble-globe/data/source/naturalearth/ne_50m_coastline.zip/ne_50m_coastline.shp"
       ],
+      "post_processing": "coordinates rounded to 4 decimals (round half to even) and written in one fixed layout by scripts/fetch_vectors.py, so the output is the same with any GDAL version",
       "output": {
         "path": "public/vectors/coastlines.geojson",
         "features": 1428,
-        "bytes": 1256816,
-        "sha256": "374b7613d4a9f6eaff7a4f7e51a03b61aa520f547b90f0ec93ac001767c69847"
+        "bytes": 1256757,
+        "sha256": "7b575e30d446b59362151514ca401c7eef87748fbba96cf9dbfe1383128ef315"
       }
     }
   }

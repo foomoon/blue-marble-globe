@@ -83,7 +83,7 @@ def fetch(name, previous):
 def main():
     for tool in ("ogr2ogr", "gdal_rasterize", "gdaladdo"):
         if not shutil.which(tool):
-            sys.exit(f"Missing {tool}. Install GDAL (macOS: brew install gdal).")
+            sys.exit(f"Missing {tool}. Install GDAL (Ubuntu: sudo apt install gdal-bin python3-gdal; macOS: brew install gdal). npm run doctor checks everything.")
     gdal2tiles = shutil.which("gdal2tiles") or shutil.which("gdal2tiles.py")
     previous = json.loads(RECORD.read_text())["sources"] if RECORD.exists() else {}
 

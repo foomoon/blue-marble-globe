@@ -64,7 +64,7 @@ def tool(*names: str) -> str:
     for n in names:
         if shutil.which(n):
             return n
-    sys.exit(f"Missing '{names[0]}'. Install GDAL (macOS: brew install gdal).")
+    sys.exit(f"Missing '{names[0]}'. Install GDAL (Ubuntu: sudo apt install gdal-bin python3-gdal; macOS: brew install gdal). npm run doctor checks everything.")
 
 
 def tile_digest(root: Path) -> tuple[int, int, str]:
@@ -85,6 +85,36 @@ def verify() -> None:
     print(f"digest  {digest}\nrecord  {rec['tiles_sha256']}")
     print("OK: tiles match provenance/build.json" if ok else "MISMATCH")
     sys.exit(0 if ok else 1)
+
+
+def jpeg_tiles_supported(gdal2tiles: str) -> bool:
+    """Whether this gdal2tiles writes JPEG tiles (GDAL 3.9+). An unknown driver fails option
+    parsing before --help is reached."""
+    p = subprocess.run([gdal2tiles, "--tiledriver=JPEG", "--help"], capture_output=True, text=True)
+    return p.returncode == 0
+
+
+def _to_jpeg(path: str) -> None:
+    from osgeo import gdal
+    gdal.UseExceptions()
+    gdal.SetConfigOption("GDAL_PAM_ENABLED", "NO")  # no .aux.xml beside each tile
+    gdal.Translate(path[:-4] + ".jpg", path, format="JPEG", bandList=[1, 2, 3],
+                   creationOptions=[f"QUALITY={JPEG_QUALITY}"])
+    os.remove(path)
+
+
+def png_tiles_to_jpeg(root: Path) -> int:
+    """Convert gdal2tiles' PNG tiles (RGB + alpha) to RGB JPEG, in parallel."""
+    from concurrent.futures import ProcessPoolExecutor
+    try:
+        from osgeo import gdal  # noqa: F401
+    except ImportError:
+        sys.exit("Converting tiles to JPEG needs GDAL's Python bindings (Ubuntu: sudo apt install python3-gdal).")
+    files = [str(p) for p in root.rglob("*.png")]
+    with ProcessPoolExecutor(os.cpu_count() or 4) as pool:
+        for _ in pool.map(_to_jpeg, files, chunksize=256):
+            pass
+    return len(files)
 
 
 def main() -> None:
@@ -138,14 +168,22 @@ def main() -> None:
     # 3. Overviews, so the lower zoom levels are averaged from the full-resolution image
     run("overviews", ["gdaladdo", "-r", "average", str(merc), "2", "4", "8", "16", "32", "64", "128", "256"])
 
-    # 4. Slice into XYZ tiles: z/x/y with y counted from the top, the web convention
+    # 4. Slice into XYZ tiles: z/x/y with y counted from the top, the web convention.
+    #    gdal2tiles writes JPEG from GDAL 3.9; before that (Ubuntu 24.04 has 3.8) it writes PNG,
+    #    and each tile is then converted to JPEG at the same quality.
+    direct = jpeg_tiles_supported(gdal2tiles)
     run("tile", [
         gdal2tiles,
         "--xyz", "-z", f"0-{MAX_ZOOM}", "-w", "none",
         f"--processes={os.cpu_count() or 4}",
-        "--tiledriver=JPEG", f"--jpeg-quality={JPEG_QUALITY}",
+        *(["--tiledriver=JPEG", f"--jpeg-quality={JPEG_QUALITY}"] if direct else ["--tiledriver=PNG"]),
         str(merc), str(OUT),
     ])
+    if not direct:
+        t0 = time.perf_counter()
+        n = png_tiles_to_jpeg(OUT)
+        commands.append(["(python)", f"convert each PNG tile to JPEG, quality {JPEG_QUALITY}, RGB ({n} tiles)"])
+        timings.append({"step": "to JPEG", "seconds": round(time.perf_counter() - t0, 1)})
 
     t0 = time.perf_counter()
     count, size, digest = tile_digest(OUT)
@@ -158,7 +196,8 @@ def main() -> None:
             "reprojection EPSG:4326 -> EPSG:3857, bilinear resampling",
             "cropped to the Web Mercator extent (about ±85.05° latitude)",
             "downsampled to 65536 px square (zoom 8) and averaged overviews for zoom 0-7",
-            f"JPEG encoding, quality {JPEG_QUALITY}",
+            f"JPEG encoding, quality {JPEG_QUALITY}"
+            + ("" if direct else " (gdal2tiles wrote PNG, as this GDAL is older than 3.9; each tile converted)"),
         ],
         "not_modified": "no colour correction, no compositing with other data, no added labels",
         "built_utc": started.strftime("%Y-%m-%dT%H:%M:%SZ"),

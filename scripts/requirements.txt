@@ -1,4 +1,6 @@
-# Python packages for scripts/build_region.py (the Blue Marble scripts need none).
-# GDAL's Python bindings come from your GDAL install (macOS: brew install gdal), so
-# create the venv with --system-site-packages. See README, "Regional Landsat layers".
+# macOS only: Python packages for the region and terrain builds (the other scripts need none).
+# GDAL's Python bindings come from your GDAL install (brew install gdal), so create the venv
+# with --system-site-packages. See README, "Higher-resolution regions".
+# On Ubuntu, don't install this: use Ubuntu's python3-numpy (scripts/setup-ubuntu.sh does),
+# which GDAL's Python bindings are built against.
 numpy==2.5.5
