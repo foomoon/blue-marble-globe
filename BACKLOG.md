@@ -14,7 +14,29 @@ Today's build reads every scene before compositing, keeps all of it on disk, and
 - Run chunks in parallel, using all CPU cores.
 - Globe progress: show chunks filling in across the region.
 
+### Regional terrain (USGS 3DEP, NASADEM elsewhere)
+
+Detailed terrain for a region, built alongside its Landsat imagery: a "terrain too" option in the Regions panel.
+
+- **Source:** USGS 3DEP Seamless at 10 m (`3dep-seamless` on Planetary Computer, PDDL; covers the US including Alaska, Hawaii and territories such as Guam). Outside it, NASADEM at 30 m (60°N to 56°S). 3DEP lidar at 2 m exists in many areas, if ever needed.
+- **Same pipeline as the Landsat build:** windowed reads of only the region's pixels, polygon masks, progress, provenance. The prototype read the 1,200 km² Grand Canyon area at zoom 9–14 in 82 s: 501 tiles, 9.8 MB.
+- **Blend into the global terrain at the edge.** The prototype showed a visible step where 10 m 3DEP meets 450 m ETOPO. Feather the last few hundred metres, or pad the terrain region beyond the imagery.
+- `src/terrain.js` takes one source today; regions need it to try the region's tiles first, then the global set.
+- Archive USGS's terms (also needed for Landsat; see Housekeeping).
+
+### Terrain in the map server
+
+Serve `public/tiles/terrain/` with TileJSON (`"encoding": "terrarium"`), so MapLibre can show it as `raster-dem` (3D terrain and hillshading). The catalog and index page need a third kind next to raster and vector.
+
 ## Ideas
+
+### Heights relative to the ellipsoid (geoid correction)
+
+ETOPO heights are above mean sea level (EGM2008 geoid); Cesium places them on the WGS84 ellipsoid unchanged, so they're off by up to about 100 m, depending on place. Correcting means adding the geoid height (NGA's EGM2008 grid, public domain), but then the sea (flattened to 0) would need the same correction or coasts would show a step. Only worth it if someone needs true heights.
+
+### Land below sea level
+
+The terrain build flattens everything below 0 m, which also flattens the Dead Sea shore, Death Valley and the Caspian depression. A land mask (Natural Earth land, already downloaded for Grey) would let them keep their real heights while the sea stays flat.
 
 ### Fade open ocean to Blue Marble in regional layers
 

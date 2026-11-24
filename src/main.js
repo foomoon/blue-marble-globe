@@ -63,8 +63,8 @@ viewer.scene.moon.show = false;
 
 mountGuide();
 
-// Lat/lon readout, bottom right
-mountCoords(viewer);
+// Lat/lon readout, bottom right (with the terrain under the cursor, once Layers is up)
+const coords = mountCoords(viewer);
 
 // Vector layers (country borders) are entities; Cesium's default double-click would lock the
 // camera onto whichever one is under the cursor, so switch that off.
@@ -72,6 +72,7 @@ viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpace
 
 // 5. Layers control: Blue Marble plus any built Landsat regions (public/tiles/landsat/index.json)
 const layers = mountLayers(viewer, baseLayer);
+coords.setTerrain(layers.terrainAt);
 
 // 6. Dev only: the Regions studio (draw, estimate, save and build regions).
 //    Vite removes this branch from production builds, so the deployed globe never has it.

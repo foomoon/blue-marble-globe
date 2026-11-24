@@ -18,6 +18,7 @@ npm install
 npm run fetch:source   # ~3 GB from NASA, checksums verified against provenance/sources.json
 npm run build:tiles    # Blue Marble: ~350 MB of tiles into public/tiles/blue-marble/, zoom 0-8
 npm run build:grey     # optional: the Grey base map (~6 min, ~600 MB on disk)
+npm run build:terrain  # optional: global terrain from NOAA (5.2 GB download, ~13 min: 8½ to download, 4 to build; needs .venv, see Regions setup)
 npm run dev
 ```
 
@@ -37,10 +38,10 @@ The HTML report, including a screenshot of the globe, is in `playwright-report/`
 
 | Path | Size | Kept? |
 | --- | --- | --- |
-| `data/source/` | 3.0 GB | Kept, so you can rebuild without downloading again. `npm run clean:source` removes it; `fetch:source` re-downloads and re-verifies it. |
+| `data/source/` | 3.0 GB (+ 5.2 GB with terrain) | Kept, so you can rebuild without downloading again: NASA's files, and NOAA's in `etopo/`. `npm run clean:source` removes them; the next build re-downloads and re-verifies. |
 | `data/work/` | ~4 GB | Deleted automatically after a successful build (`--keep-work` keeps it) |
 | `dist/` | ~1.1 GB | Output of `npm run build`, including a copy of the tiles. `npm run clean` removes it and `data/work/`. |
-| `public/tiles/` | ~1.1 GB on disk | The tiles: Blue Marble 357 MB, Grey 132 MB of data but ~600 MB on disk (150,000 small files). Keep them. |
+| `public/tiles/` | ~1.1 GB on disk, + ~830 MB with terrain | The tiles: Blue Marble 357 MB, Grey 132 MB of data but ~600 MB on disk (150,000 small files), terrain ~830 MB. Keep them. |
 
 ## Layers
 
@@ -56,6 +57,17 @@ The **Layers** button (top right) chooses the base map and switches overlays on 
 - **Grey:** flat light-grey land on a dark slate ocean, from Natural Earth's 1:10m land and lakes. Build it once with `npm run build:grey` (~6 minutes, ~600 MB on disk, gitignored). The ocean isn't in the tiles: the globe's base colour shows wherever there's no land. Borders and state lines switch to dark grey on this map.
 - **None:** no imagery, a plain dark globe, so only the overlays and regions show
 
+**Terrain** (needs `npm run build:terrain`):
+- Global elevation from **NOAA ETOPO 2022** (about 450 m, public domain), so mountains and canyons stand up when you tilt the view (right-drag or Ctrl-drag).
+- The **exaggeration** slider (1× to 5×, default 2×) makes relief visible at globe scale; 1× is true height.
+- Land only: the sea stays smooth. Imagery, regions and the border lines drape over it.
+- On **Grey** and **None**, which have no shading of their own, slopes are shaded as in a relief atlas (lit from the north-west), computed in the browser from the same tiles.
+
+<p>
+  <img src="docs/images/terrain-everest.jpg" width="49%" alt="The Himalaya with terrain on, looking north towards Everest over Blue Marble">
+  <img src="docs/images/terrain-grey.jpg" width="49%" alt="The Grey base map with relief shading over the Himalaya and Tibet">
+</p>
+
 **Overlays:**
 - **Country borders:** Natural Earth, 1:50m, public domain. Disputed segments are dashed; see `LICENSING.md` for which boundary view this is.
 - **US states:** Natural Earth, 1:50m, public domain; fainter lines under the country borders.
@@ -66,7 +78,7 @@ The **Layers** button (top right) chooses the base map and switches overlays on 
 
 The vector layers are regenerated with `npm run fetch:vectors`. To add another Natural Earth layer, add an entry to `LAYERS` in `scripts/fetch_vectors.py` and `VECTORS` in `src/layers.js`.
 
-The bottom-right corner shows the latitude/longitude under the cursor, or the centre of the view.
+The bottom-right corner shows the latitude, longitude and (with terrain on) altitude under the cursor, or at the centre of the view. The line above says where the altitude comes from and how much detail the terrain has there, e.g. `NOAA ETOPO 2022 · ≈540 m detail`. Altitudes are averages over that distance, so sharp peaks read low: Everest shows about 8,370 m, not 8,849 m.
 
 ## Guide
 
@@ -182,6 +194,9 @@ provenance/vectors.json     source, checksums and conversion of each vector laye
 public/vectors/             vector layers: country borders (426 KB), US states (66 KB), coastlines (1.3 MB); committed
 scripts/fetch_vectors.py    fetch + convert Natural Earth vector layers
 scripts/build_grey.py       build the Grey base map tiles (Natural Earth land + lakes)
+scripts/build_terrain.py    build the global terrain tiles (NOAA ETOPO 2022)
+src/terrain.js              turns the terrain tiles into Cesium terrain
+provenance/terrain.json     terrain sources (288 files' checksums), encoding, timings, tile digest
 provenance/grey.json        Grey map sources, checksums, commands, timings, tile digest
 scripts/build_server.py     map server catalog, TileJSON and index page (-> mapserver/www/)
 mapserver/                  map server container: nginx config, Dockerfile

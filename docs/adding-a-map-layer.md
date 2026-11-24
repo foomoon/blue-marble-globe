@@ -1,11 +1,12 @@
 # Adding layers in code
 
-Cesium has two kinds of layer, and this project uses both:
+Cesium has three kinds of layer, and this project uses all of them:
 
 - **Imagery layers** are tiles draped over the globe: Blue Marble, Grey and the Landsat regions. Each one is an **imagery provider** (where the tiles are, how they're laid out) wrapped in an **imagery layer** (puts it on the globe).
 - **Vector layers** are lines drawn on top: borders, states and coastlines. Each one is a GeoJSON file loaded as a **data source** of entities.
+- **Terrain** is the shape of the ground that the imagery is draped over. The globe has one **terrain provider** at a time.
 
-The viewer setup is in [`src/main.js`](../src/main.js). Base maps, overlays and regions are in [`src/layers.js`](../src/layers.js).
+The viewer setup is in [`src/main.js`](../src/main.js). Base maps, terrain, overlays and regions are in [`src/layers.js`](../src/layers.js), and the terrain decoder in [`src/terrain.js`](../src/terrain.js).
 
 ## 1. Put the files where the browser can reach them
 
@@ -100,6 +101,7 @@ borders.show = false; // switch it off
 ```
 
 - **Draw order:** data sources added later draw on top. `src/layers.js` adds them bottom to top (coastlines, then states, then country borders) and uses `viewer.dataSources.raiseToTop()` when one is switched on later.
+- **Drape lines on terrain:** set `entity.polyline.clampToGround = true`. Otherwise lines are drawn at sea level, and with terrain on, a border along a mountain ridge shows up across the foothills below it.
 - **Per-feature styling:** each entity carries its GeoJSON properties. The disputed borders are dashed based on `entity.properties.kind`:
 
   ```js
@@ -108,7 +110,37 @@ borders.show = false; // switch it off
 
 - **Changing colours later**, for example white on Blue Marble and dark grey on Grey: change the shared material's colour (`white.color = …`). Don't assign a new material to every line: Cesium then rebuilds all of their geometry, and they vanish for seconds.
 
-## 6. Stay off Cesium ion
+## 6. Terrain
+
+The terrain tiles are images whose colours encode height, in the "Terrarium" encoding that MapLibre also reads:
+
+```
+height_m = R * 256 + G + B / 256 - 32768
+```
+
+Cesium has no built-in reader for these, but it lets you supply heights yourself through a `CustomHeightmapTerrainProvider`. `src/terrain.js` fetches a tile, draws it on a canvas, reads the pixels back and turns them into heights:
+
+```js
+import { terrainProvider } from "./terrain.js";
+
+const { zoom, tiles } = await (await fetch("/tiles/terrain/tiles.json")).json();
+const available = new Set(); // "z/x/y" of each tile that exists; the rest are sea level
+for (const [z, xs] of Object.entries(tiles)) for (const [x, ys] of Object.entries(xs)) for (const y of ys) available.add(`${z}/${x}/${y}`);
+
+viewer.terrainProvider = terrainProvider({ url: "/tiles/terrain/{z}/{x}/{y}.webp", available, maxzoom: zoom[1] });
+viewer.scene.verticalExaggeration = 2; // relief is tiny at globe scale; 1 is true scale
+```
+
+Switch it off with `viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()` (a smooth Earth).
+
+Things that matter here:
+
+- **Decode the colours exactly.** Pass `{ colorSpaceConversion: "none", premultiplyAlpha: "none" }` to `createImageBitmap`. The browser otherwise colour-manages the image, and every height shifts. The tiles are lossless WebP for the same reason: lossy compression would change the heights.
+- **Cesium wants 65 × 65 heights per tile,** on the tile's edges so neighbours meet. `src/terrain.js` gives Cesium its terrain on a latitude/longitude grid and samples the Web Mercator files at each of those points. Two reasons: the Web Mercator grid stops at 85° (on that grid Cesium leaves a blank cap at each pole), and sampling lets the zoom-8 files serve Cesium's deeper levels at full detail. Beyond 85° the heights carry on from the edge, so Antarctica's plateau reaches the pole.
+- **Relief shading for flat-colour maps.** Cesium shades terrain only through the imagery on it, so on Grey the mountains would be invisible except at the horizon. `reliefProvider` in `src/terrain.js` is an imagery layer that computes a hillshade from the same heights in the browser: lighter where a slope faces the north-west light, darker where it faces away, transparent where it's flat.
+- **Pick the terrain, not the ellipsoid.** With terrain on, `camera.pickEllipsoid` finds the point at sea level behind a mountain, not the mountain itself. Use `scene.globe.pick(camera.getPickRay(position), scene)`, falling back to `pickEllipsoid` where the globe hasn't loaded yet. The lat/lon readout and the Regions panel do this.
+
+## 7. Stay off Cesium ion
 
 Cesium is built to work with Cesium ion, its hosted data service. This app uses none of it. Two lines at the top of `main.js`, before the viewer is created, make that explicit:
 
@@ -119,7 +151,7 @@ Cesium.Ion.defaultAccessToken = "";            // any accidental ion request now
 
 Together with `baseLayer` (no default ion imagery), `geocoder: false` and `baseLayerPicker: false`, every request the app makes goes to its own server; `npm test` checks this.
 
-## 7. Two Cesium pitfalls this project works around
+## 8. Two Cesium pitfalls this project works around
 
 - **Don't toggle `globe.showGroundAtmosphere` at runtime.** It recompiles the globe's shaders, and vector lines disappear for several seconds. To hide the blue haze (Grey and None do), push its distance range out of reach instead:
 

@@ -101,6 +101,8 @@ test("fresh clone (no tiles built): falls back to None, explains how to build, n
   await expect(pop.getByRole("radio", { name: "Blue Marble" })).toBeDisabled();
   await expect(pop.locator(".layers-row", { hasText: "Blue Marble" })).toContainText("npm run fetch:source && npm run build:tiles");
   await expect(pop.getByRole("radio", { name: "Grey" })).toBeDisabled();
+  await expect(pop.getByRole("checkbox", { name: "Terrain" })).toBeDisabled();
+  await expect(pop.locator(".layers-row", { hasText: "Terrain" })).toContainText("npm run build:terrain");
   await page.keyboard.press("Escape");
 
   // No NASA credit for imagery that isn't there, and no tile requests beyond the existence checks
@@ -120,7 +122,7 @@ test("guide panel shows all three docs", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Grey base map" })).toBeVisible();
   await page.getByRole("tab", { name: "Add layers in code" }).click();
   await expect(page.getByRole("heading", { name: "5. A vector layer: GeoJSON lines" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "6. Stay off Cesium ion" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "7. Stay off Cesium ion" })).toBeVisible();
   await page.getByRole("tab", { name: "Serve to other maps" }).click();
   await expect(page.getByRole("heading", { name: "Serving layers to other maps" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "4. Use it from a web map" })).toBeVisible();
@@ -128,7 +130,7 @@ test("guide panel shows all three docs", async ({ page }) => {
   await expect(page.locator(".guide-panel")).toBeHidden();
 });
 
-test("layers control: base maps, overlays, regions; choices are remembered", async ({ page, request }) => {
+test("layers control: base maps, terrain, overlays, regions; choices are remembered", async ({ page, request }) => {
   const res = await request.get("/tiles/landsat/index.json");
   const regions = res.ok() ? (await res.json()).regions : [];
   const greyBuilt = (await request.head("/tiles/grey/tiles.json")).ok();
@@ -136,7 +138,7 @@ test("layers control: base maps, overlays, regions; choices are remembered", asy
   await page.goto("/");
   await page.getByRole("button", { name: "Layers" }).click();
   const pop = page.getByRole("dialog", { name: "Map layers" });
-  await expect(pop.locator(".layers-section")).toHaveText(["Base map", "Overlays", "Regions"]);
+  await expect(pop.locator(".layers-section")).toHaveText(["Base map", "Terrain", "Overlays", "Regions"]);
   await expect(pop.getByRole("radio", { name: "Blue Marble" })).toBeChecked();
   await expect(pop.getByRole("radio", { name: "Grey" })).toBeVisible();
   await expect(pop.getByRole("radio", { name: "None" })).toBeVisible();
@@ -146,7 +148,7 @@ test("layers control: base maps, overlays, regions; choices are remembered", asy
   // Each built region is listed under Regions (the last list)
   const regionList = pop.locator(".layers-list").last();
   for (const r of regions) await expect(regionList.getByLabel(r.title, { exact: true })).toBeVisible();
-  await expect(pop.locator(".layers-row")).toHaveCount(6 + regions.length);
+  await expect(pop.locator(".layers-row")).toHaveCount(7 + regions.length); // 3 base maps, terrain, 3 overlays
 
   // Coastlines load only when first switched on
   const coast = page.waitForResponse((r) => r.url().endsWith("/vectors/coastlines.geojson") && r.ok());
@@ -171,6 +173,63 @@ test("layers control: base maps, overlays, regions; choices are remembered", asy
   // Clicking elsewhere closes it
   await page.mouse.click(640, 400);
   await expect(pop2).toBeHidden();
+});
+
+test("terrain: tiles decode to real heights; toggle and exaggeration are remembered", async ({ page, request }) => {
+  test.skip(!existsSync("public/tiles/terrain/tiles.json"), "terrain not built (npm run build:terrain)");
+  const { zoom, tiles } = await (await request.get("/tiles/terrain/tiles.json")).json();
+  expect(zoom).toEqual([0, 8]);
+  const tileAt = (lon, lat, z) => {
+    const k = 2 ** z, r = (lat * Math.PI) / 180;
+    return [Math.floor(((lon + 180) / 360) * k), Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * k)];
+  };
+  const has = (z, [x, y]) => tiles[z]?.[x]?.includes(y) ?? false;
+  const everest = tileAt(86.925, 27.988, 8);
+  expect(has(8, everest), "the tile with Everest exists").toBe(true);
+  expect(has(8, tileAt(-140, 0, 8)), "mid-Pacific: all sea, so no tile").toBe(false);
+
+  const terrainGets = [];
+  page.on("response", (r) => /\/tiles\/terrain\/\d+\//.test(r.url()) && terrainGets.push(r.status()));
+  await page.goto("/");
+
+  // Decode the Everest tile the way src/terrain.js does: its highest point is Everest's summit
+  // area, averaged over a ~550 m pixel, so a little under 8,849 m
+  const highest = await page.evaluate(async (url) => {
+    const blob = await (await fetch(url)).blob();
+    const bmp = await createImageBitmap(blob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+    const ctx = new OffscreenCanvas(256, 256).getContext("2d");
+    ctx.drawImage(bmp, 0, 0);
+    const d = ctx.getImageData(0, 0, 256, 256).data;
+    let max = -Infinity;
+    for (let i = 0; i < d.length; i += 4) max = Math.max(max, d[i] * 256 + d[i + 1] + d[i + 2] / 256 - 32768);
+    return max;
+  }, `/tiles/terrain/8/${everest[0]}/${everest[1]}.webp`);
+  expect(highest).toBeGreaterThan(8000);
+  expect(highest).toBeLessThan(8849);
+
+  // On by default at 2x, with NOAA's credit; the globe loads terrain tiles
+  await page.getByRole("button", { name: "Layers" }).click();
+  const pop = page.getByRole("dialog", { name: "Map layers" });
+  const box = pop.getByRole("checkbox", { name: "Terrain" });
+  const slider = pop.getByRole("slider", { name: "Terrain exaggeration" });
+  await expect(box).toBeChecked();
+  await expect(slider).toHaveValue("2");
+  await expect(page.getByText("NOAA NCEI, ETOPO 2022")).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => terrainGets.length, { timeout: 30_000 }).toBeGreaterThan(0);
+  expect(terrainGets.every((s) => s === 200), `terrain tile statuses: ${terrainGets}`).toBe(true);
+
+  // Change both, reload: remembered; and with terrain off, no NOAA credit
+  await slider.fill("3.5");
+  await expect(pop.locator(".layers-value")).toHaveText("3.5×");
+  await box.uncheck();
+  await expect(slider).toBeDisabled();
+  await page.reload();
+  await page.getByRole("button", { name: "Layers" }).click();
+  await expect(box).not.toBeChecked();
+  await expect(slider).toHaveValue("3.5");
+  await expect(page.getByText("NOAA NCEI, ETOPO 2022")).toHaveCount(0);
+  await expect(page.locator(".coords-terrain")).toBeHidden(); // nor the terrain line in the readout
+  await expect(page.locator(".coords-alt")).toHaveText(""); // and no altitude
 });
 
 test("base map None: no base imagery is requested, overlays still load", async ({ page }) => {
@@ -204,10 +263,14 @@ test("zooming with the cursor on the exact centre pixel doesn't stop rendering (
   await expect(page.locator(".coords")).not.toContainText("NaN");
 });
 
-test("lat/lon readout follows the cursor and falls back to the view centre", async ({ page }) => {
+test("lat/lon/alt readout follows the cursor and falls back to the view centre; terrain source above it", async ({ page }) => {
   await page.goto("/");
-  const readout = page.locator(".coords");
-  const pattern = /^\d+\.\d{4}° [NS] {2}\d+\.\d{4}° [EW]$/;
+  const readout = page.locator(".coords > div").last(); // the position line
+  const terrainBuilt = existsSync("public/tiles/terrain/tiles.json");
+  // lat, lon, and with terrain (on by default) the altitude there
+  const pattern = terrainBuilt
+    ? /^\d+\.\d{4}° [NS] {2}\d+\.\d{4}° [EW] +[\d,]+ m$/
+    : /^\d+\.\d{4}° [NS] {2}\d+\.\d{4}° [EW]$/;
   // On load: the centre of the view
   await expect(readout).toHaveText(pattern);
   await expect(readout).toHaveAttribute("title", "Centre of the view");
@@ -217,6 +280,10 @@ test("lat/lon readout follows the cursor and falls back to the view centre", asy
   await expect(readout).toHaveAttribute("title", "Under the cursor");
   await expect(readout).toHaveText(pattern);
   await expect(readout).not.toHaveText(centre);
+  // With terrain: where the altitude comes from and its detail, on the line above
+  if (terrainBuilt) {
+    await expect(page.locator(".coords-terrain")).toHaveText(/^NOAA ETOPO 2022 · (sea level|≈[\d,]+ m detail)$/);
+  }
   // Off the globe (out in space): back to the centre
   await page.mouse.move(40, 400);
   await expect(readout).toHaveAttribute("title", "Centre of the view");

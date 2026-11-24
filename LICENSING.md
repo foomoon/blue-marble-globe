@@ -90,6 +90,16 @@ The same page says no permission is needed and crediting is unnecessary, so the 
 
 **Which borders are shown.** Every boundary dataset takes a position on disputed territory. The country-borders layer uses **Natural Earth's default edition, which shows de facto control** (who actually administers an area). Segments Natural Earth classes as disputed, indefinite or a line of control are kept and **drawn dashed**. Natural Earth also publishes country-specific "point of view" editions (e.g. the US view). If this globe is used where an official position matters, choose that edition deliberately and change `scripts/fetch_vectors.py`.
 
+## 1d. Terrain: NOAA ETOPO 2022
+
+The **Terrain** layer is built by `scripts/build_terrain.py` from **ETOPO 2022**, NOAA's 15 arc-second (about 450 m) global relief model: the surface-elevation GeoTIFFs, 288 files. [`provenance/terrain.json`](provenance/terrain.json) records every file's URL and SHA-256, the encoding, the method, timings and a digest of the tiles. Heights are rounded to whole metres and the sea is flattened to sea level; nothing else is added.
+
+**Public domain, worldwide.** From the dataset's metadata ([archived copy](provenance/terms/noaa-etopo-2022-metadata.md)):
+
+> These data were produced by NOAA and are not subject to copyright protection in the United States. NOAA waives any potential copyright and related rights in these data worldwide through the Creative Commons Zero 1.0 Universal Public Domain Dedication (CC0-1.0).
+
+This is the clearest statement of any source here. There are no conditions. NOAA asks to be cited ("NOAA National Centers for Environmental Information. 2022: ETOPO 2022 15 Arc-Second Global Relief Model", doi:10.25921/fd45-gt74; see the [product page](provenance/terms/noaa-etopo-2022.md)), and the app credits "Terrain: NOAA NCEI, ETOPO 2022" while terrain is on.
+
 ## 2. The software
 
 | Component | Licence | Notes |

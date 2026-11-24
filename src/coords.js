@@ -1,5 +1,7 @@
 // Lat/lon readout, bottom right: the point under the cursor, or the centre of the view
-// when the cursor is off the globe (or on touch screens, where there's no cursor).
+// when the cursor is off the globe (or on touch screens, where there's no cursor). With terrain
+// on, the ground's altitude there too, and above it, where that altitude comes from and how much
+// detail it has.
 import * as Cesium from "cesium";
 import "./coords.css";
 
@@ -10,21 +12,65 @@ export function mountCoords(viewer) {
   const box = document.createElement("div");
   box.className = "coords";
   box.setAttribute("aria-live", "off");
+  const terrainLine = document.createElement("div");
+  terrainLine.className = "coords-terrain";
+  terrainLine.hidden = true;
+  const posLine = document.createElement("div");
+  const posText = document.createElement("span");
+  const altText = document.createElement("span"); // filled in when the terrain lookup returns
+  altText.className = "coords-alt";
+  posLine.append(posText, altText);
+  box.append(terrainLine, posLine);
   document.body.append(box);
 
   let overGlobe = false;
+  let terrainAt = null; // (lon, lat) => Promise<{source, height, detail, sea} | null>
+  let wanted = null; // the latest point to look up
+  let last = null; // the point shown
+  let looking = false;
+
+  // One lookup at a time, always for the latest point: moving the cursor fast doesn't queue up
+  async function updateTerrain() {
+    if (looking || !terrainAt) return;
+    looking = true;
+    while (wanted) {
+      const [lon, lat] = wanted;
+      wanted = null;
+      let t = null;
+      try {
+        t = await terrainAt(lon, lat);
+      } catch {}
+      if (wanted) continue; // the cursor has moved on: skip showing this one
+      terrainLine.hidden = !t;
+      altText.textContent = t ? `  ${`${Math.round(t.sea ? 0 : t.height).toLocaleString("en")} m`.padStart(7)}` : "";
+      if (t) {
+        const spacing = `≈${Number(t.detail.toPrecision(2)).toLocaleString("en")} m`;
+        terrainLine.textContent = t.sea ? `${t.source} · sea level` : `${t.source} · ${spacing} detail`;
+        terrainLine.title = t.sea
+          ? `Terrain here: ${t.source}. Land only: the sea is shown at sea level.`
+          : `Terrain here: ${t.source}. Altitude above sea level, averaged over ${spacing}: ` +
+            `sharp peaks read lower than their summits, and features smaller than ${spacing} don't show.`;
+      }
+    }
+    looking = false;
+  }
 
   function show(screenPos, label) {
-    const c = screenPos && camera.pickEllipsoid(screenPos, scene.globe.ellipsoid);
+    // The terrain surface (so a tilted view over mountains reads the right place), else the ellipsoid
+    const c = screenPos && (scene.globe.pick(camera.getPickRay(screenPos), scene) ?? camera.pickEllipsoid(screenPos, scene.globe.ellipsoid));
     if (!c) {
-      box.textContent = "—";
-      box.title = "";
+      posText.textContent = "—";
+      altText.textContent = "";
+      posLine.title = "";
+      terrainLine.hidden = true;
       return false;
     }
     const g = Cesium.Cartographic.fromCartesian(c);
     const lat = Cesium.Math.toDegrees(g.latitude), lon = Cesium.Math.toDegrees(g.longitude);
-    box.textContent = `${fmt(lat, "N", "S")}  ${fmt(lon, "E", "W")}`;
-    box.title = label;
+    posText.textContent = `${fmt(lat, "N", "S")}  ${fmt(lon, "E", "W")}`;
+    posLine.title = label;
+    wanted = last = [lon, lat];
+    updateTerrain();
     return true;
   }
 
@@ -42,5 +88,17 @@ export function mountCoords(viewer) {
   });
   camera.changed.addEventListener(() => !overGlobe && showCentre());
   camera.percentageChanged = 0.01;
+  document.addEventListener("terrain:changed", () => {
+    wanted = last;
+    updateTerrain();
+  });
   showCentre();
+
+  return {
+    /** Show the terrain under the point too; `fn(lon, lat)` resolves to its details, or null. */
+    setTerrain(fn) {
+      terrainAt = fn;
+      showCentre();
+    },
+  };
 }

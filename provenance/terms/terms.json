@@ -35,6 +35,30 @@
       "raw_file": "raw/natural-earth-terms-of-use.html",
       "raw_sha256": "724fc67818dd31e4b5ab7067631c3454b43389c9ff0c9eb6327d6aa9077ecde4",
       "text_file": "natural-earth-terms-of-use.md"
+    },
+    {
+      "name": "noaa-etopo-2022-metadata",
+      "title": "NOAA NCEI: ETOPO 2022 15 Arc-Second Global Relief Model, dataset metadata",
+      "why": "Licence for the terrain: not subject to copyright, CC0 worldwide; the requested citation",
+      "url": "https://data.noaa.gov/metaview/page?xml=NOAA/NESDIS/NGDC/MGG/DEM//iso/xml/etopo_2022.xml&view=getDataView&header=none",
+      "final_url": "https://data.noaa.gov/metaview/page?xml=NOAA/NESDIS/NGDC/MGG/DEM//iso/xml/etopo_2022.xml&view=getDataView&header=none",
+      "retrieved_utc": "2026-11-23T22:51:20Z",
+      "http_last_modified": null,
+      "raw_file": "raw/noaa-etopo-2022-metadata.html",
+      "raw_sha256": "5ed91366f8c45385397033bfc7608f930513e96347481c30f42f35389fa621cd",
+      "text_file": "noaa-etopo-2022-metadata.md"
+    },
+    {
+      "name": "noaa-etopo-2022",
+      "title": "NOAA NCEI: ETOPO Global Relief Model",
+      "why": "Product page for the terrain source: versions, downloads and the citation",
+      "url": "https://www.ncei.noaa.gov/products/etopo-global-relief-model",
+      "final_url": "https://www.ncei.noaa.gov/products/etopo-global-relief-model",
+      "retrieved_utc": "2026-11-23T22:51:20Z",
+      "http_last_modified": "Mon, 23 Nov 2026 20:54:26 GMT",
+      "raw_file": "raw/noaa-etopo-2022.html",
+      "raw_sha256": "db95cbdc2619b5cc01f78fe27f24b0ed8ae4ec0d786492941dc06a50b7b7f875",
+      "text_file": "noaa-etopo-2022.md"
     }
   ]
 }

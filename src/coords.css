@@ -15,6 +15,13 @@
   backdrop-filter: blur(6px);
 }
 
+/* The terrain under the point: smaller and dimmer than the position under it */
+.coords-terrain {
+  color: #9aa4b2;
+  font-size: 11px;
+  text-align: right;
+}
+
 @media (max-width: 600px) {
   .coords {
     bottom: 30px; /* above the credit bar, which wraps on narrow screens */

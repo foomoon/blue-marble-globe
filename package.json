@@ -16,6 +16,7 @@
     "fetch:vectors": "python3 -I scripts/fetch_vectors.py",
     "build:tiles": "python3 -I scripts/build_tiles.py",
     "build:grey": "python3 -I scripts/build_grey.py",
+    "build:terrain": ".venv/bin/python scripts/build_terrain.py",
     "verify:tiles": "python3 -I scripts/build_tiles.py --verify",
     "test": "playwright test",
     "test:server": "SERVER_TEST=1 playwright test tests/server.spec.js --project=server",

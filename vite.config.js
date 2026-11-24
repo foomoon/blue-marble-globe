@@ -23,4 +23,11 @@ const licenceHygiene = {
 
 export default defineConfig({
   plugins: [cesium(), licenceHygiene, studio()],
+  server: {
+    watch: {
+      // Hundreds of thousands of tiles, and multi-GB sources: nothing there is code, and watching
+      // them kept the dev server's CPU pegged (they're still served from public/, just not watched)
+      ignored: ["**/public/tiles/**", "**/data/**", "**/dist/**", "**/test-results/**", "**/playwright-report/**"],
+    },
+  },
 });

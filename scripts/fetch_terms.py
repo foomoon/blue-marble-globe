@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Archive the NASA pages that set the usage terms for the map imagery.
+Archive the pages that set the usage terms for the map data (NASA, Natural Earth, NOAA).
 
 Writes, for each page:
   provenance/terms/raw/<name>.html   the page exactly as served (the evidence)
@@ -43,6 +43,21 @@ PAGES = [
         "url": "https://www.naturalearthdata.com/about/terms-of-use/",
         "why": "Licence for the country-border vector layer (public domain)",
         "container_id": "content",  # this site has no <main>; its text is in <div id="content">
+    },
+    {
+        "name": "noaa-etopo-2022-metadata",
+        "title": "NOAA NCEI: ETOPO 2022 15 Arc-Second Global Relief Model, dataset metadata",
+        "url": "https://data.noaa.gov/metaview/page?xml=NOAA/NESDIS/NGDC/MGG/DEM//iso/xml/etopo_2022.xml"
+               "&view=getDataView&header=none",
+        "why": "Licence for the terrain: not subject to copyright, CC0 worldwide; the requested citation",
+        "container_id": "content",
+    },
+    {
+        "name": "noaa-etopo-2022",
+        "title": "NOAA NCEI: ETOPO Global Relief Model",
+        "url": "https://www.ncei.noaa.gov/products/etopo-global-relief-model",
+        "why": "Product page for the terrain source: versions, downloads and the citation",
+        "container_id": "block-ncei-content",
     },
 ]
 

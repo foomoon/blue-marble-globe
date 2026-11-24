@@ -253,7 +253,8 @@ export function mountStudio(viewer, layers) {
   // ---- Drawing ----
   const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
   const pick = (pos) => {
-    const c = viewer.camera.pickEllipsoid(pos, scene.globe.ellipsoid);
+    // The terrain surface where there is terrain, so a tilted view still puts corners under the cursor
+    const c = scene.globe.pick(viewer.camera.getPickRay(pos), scene) ?? viewer.camera.pickEllipsoid(pos, scene.globe.ellipsoid);
     if (!c) return null;
     const g = Cesium.Cartographic.fromCartesian(c);
     return [Cesium.Math.toDegrees(g.longitude), Cesium.Math.toDegrees(g.latitude)];

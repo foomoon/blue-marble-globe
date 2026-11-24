@@ -1,7 +1,8 @@
-// Layers control: choose the base map (Blue Marble or Grey) and switch overlays on and off
-// (borders, states, each built Landsat region, with opacity). Works in production: built
+// Layers control: choose the base map (Blue Marble or Grey), switch terrain on and off (with
+// exaggeration) and overlays (borders, states, each built Landsat region, with opacity). Works in production: built
 // regions are listed in /tiles/landsat/index.json, which scripts/build_region.py writes.
 import * as Cesium from "cesium";
+import { heightSource, reliefProvider, terrainProvider } from "./terrain.js";
 import "./layers.css";
 
 const STORE = "layers";
@@ -20,6 +21,7 @@ const BASES = [
   },
   {
     name: "grey",
+    relief: true, // flat colour shows no slopes: shade them when terrain is on
     title: "Grey",
     detail: "Natural Earth · land and lakes",
     url: "/tiles/grey/{z}/{x}/{y}.png",
@@ -31,8 +33,24 @@ const BASES = [
     atmosphere: false, // the blue atmosphere haze would tint the greys
   },
   // No imagery: a plain dark globe, so only the overlays show (lines use the white style)
-  { name: "none", title: "None", detail: "plain globe, overlays only", baseColor: "#1c1f23", atmosphere: false },
+  { name: "none", title: "None", detail: "plain globe, overlays only", baseColor: "#1c1f23", atmosphere: false, relief: true },
 ];
+
+// Global terrain (scripts/build_terrain.py). Real relief is tiny at globe scale, so it's
+// exaggerated by default; 1x is true scale.
+const TERRAIN = {
+  title: "Terrain",
+  detail: "NOAA ETOPO 2022 · 450 m",
+  url: "/tiles/terrain/{z}/{x}/{y}.webp",
+  index: "/tiles/terrain/tiles.json",
+  build: "npm run build:terrain",
+  source: "NOAA ETOPO 2022",
+  exaggeration: 2,
+  credit: new Cesium.Credit(
+    'Terrain: <a href="https://www.ncei.noaa.gov/products/etopo-global-relief-model" target="_blank" rel="noopener">NOAA NCEI, ETOPO 2022</a>',
+    true,
+  ),
+};
 
 // Line colours per base map: white reads on imagery (and the plain "None" globe), dark grey on
 // light-grey land. Each line role shares one material, so switching base map only changes its
@@ -214,7 +232,7 @@ export function mountLayers(viewer, baseLayer) {
       return null;
     }
     const layer = new Cesium.ImageryLayer(tileProvider({ url: def.url, available, maximumLevel: def.maximumLevel }));
-    viewer.imageryLayers.add(layer, 1); // just above Blue Marble, under every region and overlay
+    viewer.imageryLayers.add(layer, 1); // just above Blue Marble, under relief shading, regions and overlays
     baseLayers.set(def.name, layer);
     return layer;
   }
@@ -239,6 +257,7 @@ export function mountLayers(viewer, baseLayer) {
     globe.lightingFadeInDistance = def.atmosphere ? atmosphereDefaults.fadeIn : Number.MAX_VALUE;
     globe.lightingFadeOutDistance = def.atmosphere ? atmosphereDefaults.fadeOut : Number.MAX_VALUE;
     restyleVectors();
+    updateRelief();
     render();
     updateNotice();
   }
@@ -274,6 +293,101 @@ export function mountLayers(viewer, baseLayer) {
     notice.hidden = noticeDismissed || anyBuilt;
   }
 
+  // ---- terrain ----
+  let terrainBuilt; // true / false (not built) / undefined (checking)
+  let terrain = null; // the provider, once loaded
+  let heights = null; // its height source
+  let relief = null; // relief shading layer (Grey and None), made on first use
+  const flat = new Cesium.EllipsoidTerrainProvider();
+  const exaggeration = () => prefs.terrain?.exaggeration ?? TERRAIN.exaggeration;
+
+  async function setTerrain() {
+    const on = terrainBuilt && isOn("terrain");
+    if (on && !terrain) {
+      try {
+        const res = await fetch(TERRAIN.index);
+        const { zoom, tiles } = await res.json();
+        const available = new Set();
+        for (const [z, xs] of Object.entries(tiles)) for (const [x, ys] of Object.entries(xs)) for (const y of ys) available.add(`${z}/${x}/${y}`);
+        heights = heightSource({ url: TERRAIN.url, available, maxzoom: zoom[1] });
+        terrain = terrainProvider(heights, { credit: TERRAIN.credit });
+      } catch (err) {
+        console.warn("Couldn't load the terrain index:", err);
+        terrainBuilt = false;
+        render();
+        return;
+      }
+    }
+    const want = on ? terrain : flat;
+    if (viewer.terrainProvider !== want) viewer.terrainProvider = want;
+    viewer.scene.verticalExaggeration = on ? exaggeration() : 1;
+    updateRelief();
+    document.dispatchEvent(new Event("terrain:changed")); // the readout shows the terrain under the cursor
+  }
+
+  function updateRelief() {
+    const show = !!terrain && terrainBuilt && isOn("terrain") && !!BASES.find((b) => b.name === currentBase)?.relief;
+    if (show && !relief) {
+      relief = new Cesium.ImageryLayer(reliefProvider(heights));
+      // Just above the base maps, under every region
+      const above = Math.max(...[...baseLayers.values()].map((l) => viewer.imageryLayers.indexOf(l)));
+      viewer.imageryLayers.add(relief, above + 1);
+    }
+    if (relief) relief.show = show;
+  }
+
+  const terrainChecked = fetch(TERRAIN.index, { method: "HEAD" })
+    .then((r) => r.ok, () => false)
+    .then((ok) => {
+      terrainBuilt = ok;
+      render();
+      return setTerrain();
+    });
+
+  /**
+   * The terrain under a point, for the readout: its source, its height (true metres, not
+   * exaggerated) and how much detail it has there. Null when terrain is off.
+   */
+  async function terrainAt(lon, lat) {
+    if (!(terrain && terrainBuilt && isOn("terrain"))) return null;
+    const z = heights.maxzoom, size = 256 * 2 ** z;
+    const r = Cesium.Math.toRadians(Math.max(-85.0511, Math.min(85.0511, lat)));
+    const px = ((lon + 180) / 360) * size, py = ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * size;
+    const [h] = await heights.sample(z, [px, py], new Float32Array(1));
+    // Detail: the coarser of the source grid (15", ~463 m north-south) and the tile grid at this latitude
+    const detail = Math.max(463, (2 * Math.PI * 6378137 * Math.cos(r)) / size);
+    return { source: TERRAIN.source, height: h, detail, sea: h < 0.5 };
+  }
+
+  function terrainRow() {
+    const li = el("li", "layers-row");
+    li.innerHTML = `<input type="checkbox" id="layer-terrain"><label for="layer-terrain"><strong></strong><span></span></label>`;
+    li.querySelector("strong").textContent = TERRAIN.title;
+    li.querySelector("span").textContent = terrainBuilt === false ? `not built yet: ${TERRAIN.build}` : TERRAIN.detail;
+    const box = li.querySelector("input");
+    box.setAttribute("aria-label", TERRAIN.title);
+    box.checked = !!terrainBuilt && isOn("terrain");
+    box.disabled = terrainBuilt === false;
+    const value = el("span", "layers-value", `${exaggeration()}×`);
+    value.title = "Vertical exaggeration";
+    const slider = Object.assign(document.createElement("input"), { type: "range", min: 1, max: 5, step: 0.5, value: exaggeration() });
+    slider.className = "layers-opacity";
+    slider.setAttribute("aria-label", "Terrain exaggeration");
+    slider.disabled = !box.checked;
+    box.addEventListener("change", () => {
+      set("terrain", { on: box.checked });
+      slider.disabled = !box.checked;
+      setTerrain();
+    });
+    slider.addEventListener("input", () => {
+      set("terrain", { exaggeration: Number(slider.value) });
+      value.textContent = `${slider.value}×`;
+      viewer.scene.verticalExaggeration = Number(slider.value);
+    });
+    li.append(value, slider);
+    return li;
+  }
+
   function apply(name) {
     const entry = regions.get(name);
     if (!entry?.layer) return;
@@ -287,6 +401,10 @@ export function mountLayers(viewer, baseLayer) {
     for (const b of BASES) bases.append(baseRow(b));
     pop.append(bases);
     const section = (title) => Object.assign(el("div", "layers-section"), { textContent: title });
+
+    const terrainList = el("ul", "layers-list");
+    terrainList.append(terrainRow());
+    pop.append(section("Terrain"), terrainList);
 
     const overlays = el("ul", "layers-list");
     for (const v of VECTORS) overlays.append(row(v, false));
@@ -403,6 +521,9 @@ export function mountLayers(viewer, baseLayer) {
       e.polyline.width = width;
       e.polyline.material = materialFor(role);
       e.polyline.arcType = Cesium.ArcType.GEODESIC;
+      // Draped on the ground, so with terrain on a border follows the ridge it runs along
+      // instead of being drawn at sea level (and seen through the mountains)
+      e.polyline.clampToGround = true;
     }
   }
   function restyleVectors() {
@@ -445,8 +566,8 @@ export function mountLayers(viewer, baseLayer) {
     const order = startOn.map((v, i) => [v.drawOrder, sources[i]]).sort((a, b) => a[0] - b[0]);
     for (const [, ds] of order) if (ds) await viewer.dataSources.add(ds);
   });
-  const ready = Promise.all([refresh(), vectorsReady, basesChecked]);
-  return { refresh, suspend, ready };
+  const ready = Promise.all([refresh(), vectorsReady, basesChecked, terrainChecked]);
+  return { refresh, suspend, ready, terrainAt };
 }
 
 function el(tag, className, text) {

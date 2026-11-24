@@ -104,6 +104,11 @@
 .layers-fly:hover {
   border-color: var(--guide-accent);
 }
+.layers-value {
+  grid-area: fly;
+  color: var(--guide-muted);
+  font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 .layers-opacity {
   grid-area: opacity;
   width: 100%;

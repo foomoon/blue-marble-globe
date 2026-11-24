@@ -8,7 +8,7 @@
 //                                       ~2 min), then deletes it again
 //   npm run screenshots -- --regions-only   just the region walkthrough
 //
-// Needs the Blue Marble and Grey tiles built, and the Guam region for its shots.
+// Needs the Blue Marble, Grey and terrain tiles built, and the Guam region for its shots.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { chromium } from "@playwright/test";
@@ -75,6 +75,14 @@ await page.close();
 // 3. Grey with coastlines and borders
 page = await app({ base: "grey", ...lines, coastlines: { on: true } }, [12, 30, 9_000_000]);
 await shot(page, "globe-grey");
+await page.close();
+
+// Terrain: the Himalaya on Blue Marble, tilted; and Grey's relief shading from above
+page = await app({ base: "blue-marble", ...lines }, [86.5, 26.3, 70_000, 10, -12]);
+await shot(page, "terrain-everest");
+await page.close();
+page = await app({ base: "grey", ...lines }, [84, 31, 2_500_000]);
+await shot(page, "terrain-grey");
 await page.close();
 
 // 4. The Guide
