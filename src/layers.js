@@ -119,8 +119,24 @@ function tileProvider({ available, ...options }) {
   provider.errorEvent.addEventListener((e) => (e.retry = false));
   if (available) {
     const request = provider.requestImage.bind(provider);
-    provider.requestImage = (x, y, level, req) =>
-      available.has(`${level}/${x}/${y}`) ? request(x, y, level, req) : Promise.resolve(EMPTY_TILE);
+    // Identical tiles (available.same: tile -> its group's representative) are downloaded once and
+    // the one image is reused: on Grey that's ~115,000 inland tiles served by 3 downloads
+    const shared = new Map(); // representative "z/x/y" -> Promise<image>
+    provider.requestImage = (x, y, level, req) => {
+      const key = `${level}/${x}/${y}`;
+      if (!available.has(key)) return Promise.resolve(EMPTY_TILE);
+      const rep = available.same?.get(key);
+      if (!rep) return request(x, y, level, req);
+      let image = shared.get(rep);
+      if (!image) {
+        const [rz, rx, ry] = rep.split("/").map(Number);
+        image = request(rx, ry, rz, req);
+        if (!image) return undefined; // Cesium's request queue is full: it asks again later
+        image.catch(() => shared.delete(rep)); // a failed download can be tried again
+        shared.set(rep, image);
+      }
+      return image;
+    };
   }
   return provider;
 }
@@ -151,16 +167,31 @@ async function availability({ tiles_index }) {
   try {
     const res = await fetch(tiles_index);
     if (!res.ok) return null;
+    const index = await res.json();
     const set = new Set();
-    for (const [z, xs] of Object.entries((await res.json()).tiles))
+    for (const [z, xs] of Object.entries(index.tiles))
       for (const [x, ys] of Object.entries(xs)) for (const y of ys) set.add(`${z}/${x}/${y}`);
+    // Groups of identical tiles (Grey): each copy exists too, and points at its representative
+    if (index.same) {
+      set.same = new Map();
+      for (const [rep, copies] of Object.entries(index.same)) {
+        set.same.set(rep, rep);
+        for (const [z, xs] of Object.entries(copies))
+          for (const [x, ys] of Object.entries(xs)) for (const y of ys) {
+            set.add(`${z}/${x}/${y}`);
+            set.same.set(`${z}/${x}/${y}`, rep);
+          }
+      }
+    }
     return set;
   } catch {
     return null;
   }
 }
 
-export function mountLayers(viewer, baseLayer) {
+export function mountLayers(viewer, baseLayer, { blueMarbleProbe } = {}) {
+  // Blue Marble's built check follows the format main.js chose (JPEG or WebP)
+  if (blueMarbleProbe) BASES.find((b) => b.name === "blue-marble").probe = blueMarbleProbe;
   const prefs = load();
   const regions = new Map(); // name -> { region, layer }
   const suspended = new Set(); // regions hidden while the studio rebuilds them

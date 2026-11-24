@@ -4,8 +4,8 @@ Everything the globe shows is built on your machine from public-domain sources, 
 
 | Layer | Source | Command | Time | Size |
 | --- | --- | --- | --- | --- |
-| **Blue Marble** base map | NASA Blue Marble: Next Generation | `npm run fetch:source` + `npm run build:tiles` | ~8½ min | ~350 MB |
-| **Grey** base map | Natural Earth 1:10m land + lakes | `npm run build:grey` | ~6 min | ~600 MB on disk |
+| **Blue Marble** base map | NASA Blue Marble: Next Generation | `npm run fetch:source` + `npm run build:tiles` | ~2 min download + ~12 min build | ~156 MB (WebP) |
+| **Grey** base map | Natural Earth 1:10m land + lakes | `npm run build:grey` | ~6 min | ~150 MB on disk |
 | **Terrain** | NOAA ETOPO 2022, 15″ | `npm run build:terrain` | ~13 min: 8½ to download, 4 to build | ~830 MB |
 | **Borders, states, coastlines** | Natural Earth 1:50m | `npm run fetch:vectors` | seconds | ~1.8 MB (committed) |
 | **Landsat regions** | USGS Landsat 8/9 | Regions panel (dev) | minutes per region | varies |
@@ -23,9 +23,15 @@ Tiles go in `public/tiles/` (gitignored, reproducible). The vector files are sma
 
 ```bash
 npm run fetch:source   # 8 NASA GeoTIFFs, ~3.2 GB
-npm run build:tiles    # -> public/tiles/blue-marble/{z}/{x}/{y}.jpg, zoom 0-8
+npm run build:tiles    # -> public/tiles/blue-marble-webp/{z}/{x}/{y}.webp, zoom 0-8
 npm run verify:tiles   # re-hash every tile against provenance/build.json
 ```
+
+**Formats:** WebP by default, at quality 80, into `public/tiles/blue-marble-webp/`: 156 MB, about half the size of JPEG. `npm run build:tiles -- --format jpeg` builds JPEG (quality 85, 349 MB) into `public/tiles/blue-marble/` instead, for clients older than about 2020, and `--format both` builds both from one reprojection. A build in one format leaves the other's tiles and record untouched.
+
+*Why WebP 80:* measured against the full-resolution image, it scores slightly below JPEG 85 (SSIM 0.984 against 0.991; a touch smoother on open sea), and side by side there's no visible difference. WebP 88 matches JPEG's score at 76% of its size, if that ever matters. When WebP tiles exist, the globe uses them; otherwise JPEG. The map server lists both, as `blue-marble` and `blue-marble-webp`.
+
+**Performance profile:** every build records, per step, the wall time, CPU time, how many cores it kept busy, peak memory, output sizes and throughput, plus the machine (CPU, cores, memory) and the download's timings, in `provenance/build.json` under `profile`, and prints them as a table.
 
 **fetch:source** downloads eight 21600 × 21600 GeoTIFFs from NASA: the August 2004 topography + bathymetry images, 500 m per pixel. Each file's URL, size and **SHA-256** go into `provenance/sources.json`. Later runs check the files against it and stop if any byte differs.
 
@@ -54,6 +60,10 @@ This draws Natural Earth's 1:10m **land** as flat light grey (`#d6d6d6`) and lea
 | Rasterise | `gdal_rasterize` | Land burned in as grey on the zoom-9 grid; lakes burned back to transparent |
 | Overviews | `gdaladdo` | Averaged smaller versions |
 | Tile | `gdal2tiles --xyz --exclude` | PNG tiles; all-water tiles aren't written at all |
+
+**Identical tiles are stored once.** Three in four Grey tiles are the same solid grey square inland, and every small file takes a whole disk block. So after tiling, `scripts/dedupe_tiles.py` replaces each duplicate with a hard link to one copy: every tile is still an ordinary file at its usual path, but the 150,196 tiles take ~150 MB on disk instead of ~620 MB. When copying the tiles to another machine, keep the links (`rsync -H`, `cp -a` or `tar`), or they'll take the full size there.
+
+`tiles.json` also lists those groups (`"same"`: one representative tile, then its copies), so **the globe downloads each repeated tile once** and reuses it: over inland views, Grey's downloads drop by about two-thirds, and at zoom 9 nearly to nothing. Other web maps don't need to know: every tile is still served as its own file. `npm run build:grey -- --reindex` rewrites `tiles.json` from existing tiles.
 
 The ocean colour isn't in the tiles. The globe's base colour (`#3b3f45`) shows wherever there's no land tile, which is why ocean tiles never need to exist. `tiles.json` lists the tiles that do exist, so the globe never requests one that doesn't. `provenance/grey.json` records both downloads' checksums, the commands and a tile digest.
 

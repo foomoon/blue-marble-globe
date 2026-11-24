@@ -27,8 +27,8 @@ Then:
 ```bash
 npm install
 npm run fetch:source   # ~3 GB from NASA, checksums verified against provenance/sources.json
-npm run build:tiles    # Blue Marble: ~350 MB of tiles into public/tiles/blue-marble/, zoom 0-8
-npm run build:grey     # optional: the Grey base map (~6 min, ~600 MB on disk)
+npm run build:tiles    # Blue Marble: ~156 MB of WebP tiles into public/tiles/blue-marble-webp/, zoom 0-8 (--format jpeg for JPEG)
+npm run build:grey     # optional: the Grey base map (~6 min, ~150 MB on disk)
 npm run build:terrain  # optional: global terrain from NOAA (5.2 GB download, ~13 min: 8½ to download, 4 to build; needs .venv, see Regions setup)
 npm run dev
 ```
@@ -52,7 +52,7 @@ The HTML report, including a screenshot of the globe, is in `playwright-report/`
 | `data/source/` | 3.0 GB (+ 5.2 GB with terrain) | Kept, so you can rebuild without downloading again: NASA's files, and NOAA's in `etopo/`. `npm run clean:source` removes them; the next build re-downloads and re-verifies. |
 | `data/work/` | ~4 GB | Deleted automatically after a successful build (`--keep-work` keeps it) |
 | `dist/` | ~1.1 GB | Output of `npm run build`, including a copy of the tiles. `npm run clean` removes it and `data/work/`. |
-| `public/tiles/` | ~1.1 GB on disk, + ~830 MB with terrain | The tiles: Blue Marble 357 MB, Grey 132 MB of data but ~600 MB on disk (150,000 small files), terrain ~830 MB. Keep them. |
+| `public/tiles/` | ~1.4 GB on disk | The tiles: Blue Marble ~400 MB (WebP), Grey ~150 MB (identical tiles stored once, as hard links), terrain ~880 MB, regions a few MB each. Keep them. |
 
 ## Layers
 
@@ -65,7 +65,7 @@ The **Layers** button (top right) chooses the base map and switches overlays on 
 
 **Base map** (pick one):
 - **Blue Marble:** NASA satellite imagery
-- **Grey:** flat light-grey land on a dark slate ocean, from Natural Earth's 1:10m land and lakes. Build it once with `npm run build:grey` (~6 minutes, ~600 MB on disk, gitignored). The ocean isn't in the tiles: the globe's base colour shows wherever there's no land. Borders and state lines switch to dark grey on this map.
+- **Grey:** flat light-grey land on a dark slate ocean, from Natural Earth's 1:10m land and lakes. Build it once with `npm run build:grey` (~6 minutes, ~150 MB on disk, gitignored). The ocean isn't in the tiles: the globe's base colour shows wherever there's no land. Borders and state lines switch to dark grey on this map.
 - **None:** no imagery, a plain dark globe, so only the overlays and regions show
 
 **Terrain** (needs `npm run build:terrain`):

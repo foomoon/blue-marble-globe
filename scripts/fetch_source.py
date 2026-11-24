@@ -77,20 +77,32 @@ def main() -> None:
     if RECORD.exists():
         recorded = {f["file"]: f for f in json.loads(RECORD.read_text())["files"]}
 
-    files = []
+    files, profile = [], []
+    t_all = time.perf_counter()
     for tile in TILES:
         name = f"{PREFIX}.{tile}_geo.tif"
         url = f"{BASE_URL}/{name}"
         out = DEST / name
         headers = {}
 
+        t0 = time.perf_counter()
         if out.exists():
             print(f"have {name}")
+            got = False
         else:
             print(f"GET  {url}")
             headers = download(url, out)
-
+            got = True
+        t_dl = time.perf_counter() - t0
+        t0 = time.perf_counter()
         digest = sha256_of(out)
+        t_hash = time.perf_counter() - t0
+        size = out.stat().st_size
+        profile.append({"file": name, "bytes": size, "downloaded": got, "download_seconds": round(t_dl, 1),
+                        "mb_per_second": round(size / 1e6 / t_dl, 1) if got and t_dl else None,
+                        "sha256_seconds": round(t_hash, 1)})
+        if got:
+            print(f"     {size / 1e6:,.0f} MB in {t_dl:.1f} s ({size / 1e6 / t_dl:.1f} MB/s), checksum {t_hash:.1f} s")
         prev = recorded.get(name)
         if prev and prev["sha256"] != digest:
             sys.exit(
@@ -126,6 +138,19 @@ def main() -> None:
         + "\n"
     )
     print(f"\nRecorded {len(files)} files in {RECORD.relative_to(ROOT)}")
+    # This run's timings, beside the downloads (they vary per run and machine, so they're not in
+    # sources.json); build_tiles.py copies them into its performance profile
+    total = round(time.perf_counter() - t_all, 1)
+    downloaded = [p for p in profile if p["downloaded"]]
+    (DEST / "download-profile.json").write_text(json.dumps({
+        "run_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "wall_seconds": total,
+        "bytes_downloaded": sum(p["bytes"] for p in downloaded),
+        "mb_per_second": round(sum(p["bytes"] for p in downloaded) / 1e6 / max(0.1, sum(p["download_seconds"] for p in downloaded)), 1)
+                         if downloaded else None,
+        "files": profile,
+    }, indent=2) + "\n")
+    print(f"Total {total:.0f} s" + (f", {len(downloaded)} files downloaded" if downloaded else ""))
 
 
 if __name__ == "__main__":

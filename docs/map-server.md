@@ -54,7 +54,7 @@ A map needs **one base map** underneath, then any overlays on top:
 
 | Layer | Role | URL | Zooms |
 | --- | --- | --- | --- |
-| Blue Marble | base map | `/tiles/blue-marble/{z}/{x}/{y}.jpg` | 0–8 |
+| Blue Marble | base map | `/tiles/blue-marble-webp/{z}/{x}/{y}.webp` (the default build), or `/tiles/blue-marble/{z}/{x}/{y}.jpg` if built as JPEG | 0–8 |
 | Grey | base map (transparent water: give the map a dark background) | `/tiles/grey/{z}/{x}/{y}.png` | 0–9 |
 | Landsat region | detail overlay for one area | `/tiles/landsat/<region>/{z}/{x}/{y}.webp` | per region, e.g. Guam 8–12 |
 | Terrain | elevation, for 3D and hillshading | `/tiles/terrain/{z}/{x}/{y}.webp` | 0–8 |
@@ -74,7 +74,7 @@ Cesium.CreditDisplay.cesiumCredit = undefined; // ...so drop the ion logo too
 
 // 1. The base map: Blue Marble...
 const blueMarble = new Cesium.UrlTemplateImageryProvider({
-  url: `${SERVER}/tiles/blue-marble/{z}/{x}/{y}.jpg`,
+  url: `${SERVER}/tiles/blue-marble-webp/{z}/{x}/{y}.webp`, // or blue-marble/…jpg if built as JPEG
   tilingScheme: new Cesium.WebMercatorTilingScheme(),
   maximumLevel: 8,
   credit: new Cesium.Credit("Imagery: NASA Earth Observatory, Blue Marble: Next Generation", true),
@@ -149,7 +149,7 @@ For one region, use its terrain instead (`/tiles/landsat/guam/terrain/tilejson.j
 ### Leaflet
 
 ```js
-L.tileLayer("http://localhost:8080/tiles/blue-marble/{z}/{x}/{y}.jpg", {
+L.tileLayer("http://localhost:8080/tiles/blue-marble-webp/{z}/{x}/{y}.webp", {
   maxNativeZoom: 8, // enlarge zoom 8 beyond it
   maxZoom: 12,
   attribution: "Imagery: NASA Earth Observatory, Blue Marble: Next Generation",
@@ -188,6 +188,7 @@ new ol.layer.Vector({
   ```
 
   Let the proxy handle HTTPS; the server honours its `X-Forwarded-Proto` header.
+- **Copying the tiles to another machine:** use `rsync -aH` (or `cp -a`, or `tar`), which keeps hard links. Grey stores its identical tiles once as hard links; a plain copy expands it from ~150 MB to ~620 MB.
 - **Caching.** Tiles are cached for a day. The catalog and TileJSON are always revalidated, so a refreshed catalog shows up immediately.
 
 ## 6. Attribution travels with the layers

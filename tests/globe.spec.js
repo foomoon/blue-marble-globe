@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 
 test.beforeAll(() => {
   expect(
-    existsSync("public/tiles/blue-marble/0/0/0.jpg"),
+    existsSync("public/tiles/blue-marble-webp/0/0/0.webp") || existsSync("public/tiles/blue-marble/0/0/0.jpg"),
     "No tiles found. Build them first: npm run fetch:source && npm run build:tiles",
   ).toBe(true);
 });
@@ -23,7 +23,7 @@ test("globe loads every resource from its own origin, with NASA credit and no io
     if (new URL(url).origin !== origin) external.push(url);
   });
   page.on("response", (res) => {
-    if (/\/tiles\/blue-marble\/\d+\/\d+\/\d+\.jpg$/.test(res.url())) {
+    if (/\/tiles\/blue-marble(-webp)?\/\d+\/\d+\/\d+\.(jpg|webp)$/.test(res.url())) {
       tileStatuses.push(res.status());
       lastTile = Date.now();
     }
@@ -89,7 +89,7 @@ test("fresh clone (no tiles built): falls back to None, explains how to build, n
   await page.route("**/tiles/**", (r) => r.fulfill({ status: 404, body: "not found" }));
   const tileGets = [];
   page.on("request", (r) => {
-    if (r.method() === "GET" && /\/tiles\/(blue-marble|grey)\/\d+\//.test(r.url())) tileGets.push(r.url());
+    if (r.method() === "GET" && /\/tiles\/(blue-marble|blue-marble-webp|grey)\/\d+\//.test(r.url())) tileGets.push(r.url());
   });
   await page.goto("/");
 
@@ -269,7 +269,7 @@ test("base map None: no base imagery is requested, overlays still load", async (
   await page.reload(); // start fresh on None, so nothing Blue Marble is already in flight
   const baseTiles = [];
   // GETs only: the HEAD requests are the "is this base map built?" checks, not tile downloads
-  page.on("request", (r) => r.method() === "GET" && /\/tiles\/(blue-marble|grey)\/\d+\//.test(r.url()) && baseTiles.push(r.url()));
+  page.on("request", (r) => r.method() === "GET" && /\/tiles\/(blue-marble|blue-marble-webp|grey)\/\d+\//.test(r.url()) && baseTiles.push(r.url()));
   const borders = page.waitForResponse((r) => r.url().endsWith("/vectors/country-borders.geojson"));
   await page.reload();
   await borders;
@@ -327,7 +327,10 @@ test("production build ships Cesium's licence and drops the moon texture", async
   // vite preview answers missing files with index.html (200), so check what came back
   const moon = await request.get("/cesium/Assets/Textures/moonSmall.jpg");
   expect(moon.headers()["content-type"]).not.toContain("image/");
-  const prov = await request.get("/tiles/blue-marble/PROVENANCE.json");
+  // Blue Marble's record ships with its tiles: WebP (the default), or JPEG
+  const webp = existsSync("public/tiles/blue-marble-webp/PROVENANCE.json");
+  const prov = await request.get(webp ? "/tiles/blue-marble-webp/PROVENANCE.json" : "/tiles/blue-marble/PROVENANCE.json");
   expect(prov.status()).toBe(200);
-  expect((await prov.json()).build.output.tile_count).toBeGreaterThan(80_000);
+  const build = (await prov.json()).build;
+  expect((webp ? build.output_webp : build.output).tile_count).toBeGreaterThan(80_000);
 });

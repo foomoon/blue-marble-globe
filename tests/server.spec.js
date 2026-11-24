@@ -65,7 +65,10 @@ test("tiles: real tiles are served with CORS and caching; skipped tiles answer 2
     let missing = null;
     const index = await request.get(url(`/tiles/${layer.id}/tiles.json`));
     if (index.ok()) {
-      const { tiles } = await index.json();
+      const { tiles, same } = await index.json();
+      // Copies of a repeated tile (Grey's "same" groups) are real files too
+      for (const copies of Object.values(same ?? {}))
+        for (const [z, xs] of Object.entries(copies)) for (const [x, ys] of Object.entries(xs)) ((tiles[z] ??= {})[x] ??= []).push(...ys);
       const z = Object.keys(tiles).map(Number).sort((a, b) => b - a)[0];
       const x = Object.keys(tiles[z])[0];
       have = [z, Number(x), tiles[z][x][0]];

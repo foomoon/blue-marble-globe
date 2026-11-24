@@ -15,7 +15,8 @@ Writes:
   provenance/grey.json                         sources + checksums, commands, timings, tile digest
   public/tiles/grey/PROVENANCE.json            a copy shipped with the tiles
 
-  python3 scripts/build_grey.py      (needs GDAL)
+  python3 scripts/build_grey.py              (needs GDAL)
+  python3 scripts/build_grey.py --reindex    only rewrite tiles.json from the tiles already built
 """
 
 from __future__ import annotations
@@ -80,7 +81,37 @@ def fetch(name, previous):
     }
 
 
+def write_index() -> tuple[list[str], int]:
+    """tiles.json: which tiles exist, so the globe never requests one that doesn't, and which are
+    identical, so it downloads each repeated tile once ("same": a representative tile, then the
+    tiles that are copies of it, listed like "tiles"). Returns the digest lines and total bytes."""
+    by_hash, lines, size = {}, [], 0
+    for p in sorted(OUT.rglob("*.png")):
+        b = p.read_bytes()
+        size += len(b)
+        digest = hashlib.sha256(b).hexdigest()
+        by_hash.setdefault(digest, []).append(p.relative_to(OUT).with_suffix("").parts)
+        lines.append(f"{p.relative_to(OUT).as_posix()} {digest}")
+    tiles, same = {}, {}
+    for group in by_hash.values():
+        z, x, y = group[0]
+        tiles.setdefault(z, {}).setdefault(x, []).append(int(y))  # each distinct tile once
+        if len(group) > 1:
+            copies = same.setdefault(f"{z}/{x}/{y}", {})
+            for z2, x2, y2 in group[1:]:
+                copies.setdefault(z2, {}).setdefault(x2, []).append(int(y2))
+    for xs in [*tiles.values(), *(c for copies in same.values() for c in copies.values())]:
+        for ys in xs.values():
+            ys.sort()
+    (OUT / "tiles.json").write_text(json.dumps({"zoom": [0, MAX_ZOOM], "tiles": tiles, "same": same},
+                                               separators=(",", ":")))
+    return lines, size
+
+
 def main():
+    if sys.argv[1:] == ["--reindex"]:  # rewrite tiles.json from the tiles already built
+        lines, _ = write_index()
+        return print(f"wrote {(OUT / 'tiles.json').relative_to(ROOT)} ({len(lines):,} tiles)")
     for tool in ("ogr2ogr", "gdal_rasterize", "gdaladdo"):
         if not shutil.which(tool):
             sys.exit(f"Missing {tool}. Install GDAL (Ubuntu: sudo apt install gdal-bin python3-gdal; macOS: brew install gdal). npm run doctor checks everything.")
@@ -126,15 +157,18 @@ def main():
     run("tile", [gdal2tiles, "--xyz", "-z", f"0-{MAX_ZOOM}", "-w", "none", "--exclude",
                  f"--processes={os.cpu_count() or 4}", str(mask), str(OUT)])
 
+    # Most zoom-9 tiles are the same solid grey square inland: store identical tiles once (hard
+    # links), so each costs a directory entry, not a ~4 KB disk block. Paths and contents unchanged.
+    t = time.perf_counter()
+    sys.path.insert(0, str(Path(__file__).parent))
+    from dedupe_tiles import dedupe
+    deduped = dedupe(OUT)
+    timings.append({"step": "dedupe", "seconds": round(time.perf_counter() - t, 1)})
+    print(f"dedupe: {deduped['files']:,} tiles, {deduped['unique']:,} distinct; "
+          f"on disk {deduped['disk_before'] / 1e6:,.0f} MB -> {deduped['disk_after'] / 1e6:,.0f} MB")
+
     # tiles.json + digest
-    idx, lines, size = {}, [], 0
-    for p in sorted(OUT.rglob("*.png")):
-        z, x, y = p.relative_to(OUT).with_suffix("").parts
-        idx.setdefault(z, {}).setdefault(x, []).append(int(y))
-        b = p.read_bytes()
-        size += len(b)
-        lines.append(f"{p.relative_to(OUT).as_posix()} {hashlib.sha256(b).hexdigest()}")
-    (OUT / "tiles.json").write_text(json.dumps({"zoom": [0, MAX_ZOOM], "tiles": idx}, separators=(",", ":")))
+    lines, size = write_index()
 
     gdal_version = subprocess.run(["gdalinfo", "--version"], capture_output=True, text=True).stdout.strip()
     record = {
@@ -147,6 +181,9 @@ def main():
         "built_utc": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "environment": {"gdal": gdal_version, "python": platform.python_version(), "platform": platform.platform()},
         "wall_clock_seconds": {"total": round(time.perf_counter() - t_all, 1), "steps": timings},
+        "deduplication": {"method": "identical tiles hard-linked to one copy (scripts/dedupe_tiles.py)",
+                          "distinct_tiles": deduped["unique"], "disk_mb_before": round(deduped["disk_before"] / 1e6),
+                          "disk_mb_after": round(deduped["disk_after"] / 1e6)},
         "output": {"path": "public/tiles/grey/{z}/{x}/{y}.png", "zoom": [0, MAX_ZOOM], "tile_count": len(lines),
                    "bytes": size, "tiles_sha256": hashlib.sha256("\n".join(lines).encode()).hexdigest()},
     }

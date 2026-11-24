@@ -61,6 +61,16 @@ def tiled_layers(base: str) -> list[dict]:
             "license": "Used under NASA's Images and Media Usage Guidelines; credit NASA Earth Observatory. See /licensing.",
             "version": bm["build"]["built_utc"], "provenance": "/tiles/blue-marble/PROVENANCE.json",
         })
+    bmw = provenance(TILES / "blue-marble-webp" / "PROVENANCE.json")
+    if bmw and bmw["build"].get("output_webp"):
+        layers.append({
+            "id": "blue-marble-webp", "name": "Blue Marble (WebP)", "kind": "raster", "format": "webp",
+            "description": "The same Blue Marble base map, as WebP: smaller tiles, for any browser from 2020 on.",
+            "minzoom": 0, "maxzoom": bmw["build"]["output_webp"]["zoom"][1], "bounds": WORLD,
+            "attribution": NASA,
+            "license": "Used under NASA's Images and Media Usage Guidelines; credit NASA Earth Observatory. See /licensing.",
+            "version": bmw["build"]["built_utc"], "provenance": "/tiles/blue-marble-webp/PROVENANCE.json",
+        })
     grey = provenance(TILES / "grey" / "PROVENANCE.json")
     if grey:
         layers.append({

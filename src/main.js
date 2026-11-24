@@ -30,9 +30,16 @@ Cesium.Camera.prototype.rotate = function (axis, angle) {
   return cameraRotate.call(this, axis, angle);
 };
 
-// 1. Describe where the tiles live and how they were cut.
+// 1. Describe where the tiles live and how they were cut. Blue Marble is built as JPEG and,
+//    optionally, WebP (smaller): use WebP when it's there (npm run build:tiles -- --format webp).
+const BLUE_MARBLE = {
+  webp: { url: "/tiles/blue-marble-webp/{z}/{x}/{y}.webp", probe: "/tiles/blue-marble-webp/0/0/0.webp" },
+  jpeg: { url: "/tiles/blue-marble/{z}/{x}/{y}.jpg", probe: "/tiles/blue-marble/0/0/0.jpg" },
+};
+const blueMarbleFormat = (await fetch(BLUE_MARBLE.webp.probe, { method: "HEAD" }).then((r) => r.ok, () => false))
+  ? "webp" : "jpeg";
 const blueMarble = new Cesium.UrlTemplateImageryProvider({
-  url: "/tiles/blue-marble/{z}/{x}/{y}.jpg", // public/tiles/blue-marble/
+  url: BLUE_MARBLE[blueMarbleFormat].url, // public/tiles/blue-marble(-webp)/
   tilingScheme: new Cesium.WebMercatorTilingScheme(), // gdal2tiles --xyz, EPSG:3857
   maximumLevel: 8, // highest zoom built by scripts/build_tiles.py
   credit: nasaCredit,
@@ -71,7 +78,7 @@ const coords = mountCoords(viewer);
 viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
 // 5. Layers control: Blue Marble plus any built Landsat regions (public/tiles/landsat/index.json)
-const layers = mountLayers(viewer, baseLayer);
+const layers = mountLayers(viewer, baseLayer, { blueMarbleProbe: BLUE_MARBLE[blueMarbleFormat].probe });
 coords.setTerrain(layers.terrainAt);
 
 // 6. Dev only: the Regions studio (draw, estimate, save and build regions).

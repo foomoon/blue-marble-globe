@@ -25,7 +25,7 @@ public/vectors/country-borders.geojson  →   /vectors/country-borders.geojson
 import * as Cesium from "cesium";
 
 const blueMarble = new Cesium.UrlTemplateImageryProvider({
-  url: "/tiles/blue-marble/{z}/{x}/{y}.jpg",
+  url: "/tiles/blue-marble-webp/{z}/{x}/{y}.webp", // main.js falls back to blue-marble/…jpg if only JPEG is built
   tilingScheme: new Cesium.WebMercatorTilingScheme(),
   maximumLevel: 8,
   credit: "Imagery: NASA Earth Observatory, Blue Marble: Next Generation",
