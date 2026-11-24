@@ -27,11 +27,22 @@ export default defineConfig({
       url: "http://localhost:4173",
       timeout: 180_000,
       reuseExistingServer: false,
+      env: { VITE_MAP_SERVER_URL: "" }, // tested reading its own files, whatever .env.local says
     },
     {
       command: "npx vite --port 5174 --strictPort",
       url: "http://localhost:5174",
       reuseExistingServer: false,
+      env: { VITE_MAP_SERVER_URL: "" }, // tested reading its own files, whatever .env.local says
     },
+    // With the map server tests: a globe that takes its data from the map server
+    ...(process.env.SERVER_TEST
+      ? [{
+          command: "npx vite --port 5175 --strictPort",
+          url: "http://localhost:5175",
+          env: { VITE_MAP_SERVER_URL: process.env.MAPSERVER_URL ?? "http://localhost:8080" },
+          reuseExistingServer: false,
+        }]
+      : []),
   ],
 });

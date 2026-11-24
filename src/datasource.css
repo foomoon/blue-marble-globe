@@ -1,0 +1,32 @@
+/* "Data: local" / "Data: map server", top right, under the Layers and Guide buttons */
+.data-source {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(12, 18, 28, 0.7);
+  backdrop-filter: blur(6px);
+  color: #c9ced6;
+  font: 500 11.5px var(--guide-font, system-ui, sans-serif);
+  cursor: default;
+}
+.data-source i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9aa4b2; /* local, or checking */
+}
+.data-source[data-state="online"] i {
+  background: #5fd38a;
+}
+.data-source[data-state="offline"] i {
+  background: #ff6b6b;
+}
+.data-source[data-state="offline"] {
+  color: #ffb3b3;
+}

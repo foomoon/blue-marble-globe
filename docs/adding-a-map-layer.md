@@ -151,7 +151,7 @@ Cesium.CreditDisplay.cesiumCredit = undefined; // remove the ion logo Cesium add
 Cesium.Ion.defaultAccessToken = "";            // any accidental ion request now fails
 ```
 
-Together with `baseLayer` (no default ion imagery), `geocoder: false` and `baseLayerPicker: false`, every request the app makes goes to its own server; `npm test` checks this.
+Together with `baseLayer` (no default ion imagery), `geocoder: false` and `baseLayerPicker: false`, every request the app makes goes to its own server (or, if built with `VITE_MAP_SERVER_URL`, map data to that map server; `src/data.js`); `npm test` checks this.
 
 ## 8. Two Cesium pitfalls this project works around
 

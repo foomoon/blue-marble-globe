@@ -3,6 +3,7 @@
 // regions are listed in /tiles/landsat/index.json, which scripts/build_region.py writes.
 import * as Cesium from "cesium";
 import { heightSource, reliefProvider, terrainProvider } from "./terrain.js";
+import { dataFetch, dataUrl, exists, reportingTiles } from "./data.js";
 import "./layers.css";
 
 const STORE = "layers";
@@ -117,6 +118,7 @@ const store = (prefs) => {
 function tileProvider({ available, ...options }) {
   const provider = new Cesium.UrlTemplateImageryProvider({ tilingScheme: new Cesium.WebMercatorTilingScheme(), ...options });
   provider.errorEvent.addEventListener((e) => (e.retry = false));
+  reportingTiles(provider); // each download tells the data source indicator whether the server answered
   if (available) {
     const request = provider.requestImage.bind(provider);
     // Identical tiles (available.same: tile -> its group's representative) are downloaded once and
@@ -165,7 +167,7 @@ export function regionLayer(region, opts) {
 async function availability({ tiles_index }) {
   if (!tiles_index) return null; // older builds: request every tile in the bbox
   try {
-    const res = await fetch(tiles_index);
+    const res = await dataFetch(tiles_index);
     if (!res.ok) return null;
     const index = await res.json();
     const set = new Set();
@@ -262,7 +264,7 @@ export function mountLayers(viewer, baseLayer, { blueMarbleProbe } = {}) {
       baseBuilt.set(def.name, false);
       return null;
     }
-    const layer = new Cesium.ImageryLayer(tileProvider({ url: def.url, available, maximumLevel: def.maximumLevel }));
+    const layer = new Cesium.ImageryLayer(tileProvider({ url: dataUrl(def.url), available, maximumLevel: def.maximumLevel }));
     viewer.imageryLayers.add(layer, 1); // just above Blue Marble, under relief shading, regions and overlays
     baseLayers.set(def.name, layer);
     return layer;
@@ -297,7 +299,7 @@ export function mountLayers(viewer, baseLayer, { blueMarbleProbe } = {}) {
   const basesChecked = Promise.all(
     BASES.filter((b) => b.probe).map(async (b) => {
       try {
-        baseBuilt.set(b.name, (await fetch(b.probe, { method: "HEAD" })).ok);
+        baseBuilt.set(b.name, await exists(b.probe));
       } catch {
         baseBuilt.set(b.name, false);
       }
@@ -337,7 +339,7 @@ export function mountLayers(viewer, baseLayer, { blueMarbleProbe } = {}) {
   const exaggeration = () => prefs.terrain?.exaggeration ?? TERRAIN.exaggeration;
 
   async function loadIndex(url) {
-    const { zoom, tiles } = await (await fetch(url)).json();
+    const { zoom, tiles } = await (await dataFetch(url)).json();
     const available = new Set();
     for (const [z, xs] of Object.entries(tiles)) for (const [x, ys] of Object.entries(xs)) for (const y of ys) available.add(`${z}/${x}/${y}`);
     return { zoom, available };
@@ -350,7 +352,7 @@ export function mountLayers(viewer, baseLayer, { blueMarbleProbe } = {}) {
     if (!regionTerrain.has(key)) {
       regionTerrain.set(key, loadIndex(r.terrain.tiles_index).then(
         ({ zoom, available }) => ({
-          name: r.name, label: r.terrain.source, url: `${r.terrain.url}?b=${encodeURIComponent(r.built_utc)}`, available,
+          name: r.name, label: r.terrain.source, url: dataUrl(`${r.terrain.url}?b=${encodeURIComponent(r.built_utc)}`), available,
           minzoom: zoom[0], maxzoom: zoom[1], detail: r.terrain.detail_m, shareInBlue: true, credit: r.terrain.credit,
         }),
         () => null,
@@ -368,7 +370,7 @@ export function mountLayers(viewer, baseLayer, { blueMarbleProbe } = {}) {
       try {
         if (!globalSource) {
           const { zoom, available } = await loadIndex(TERRAIN.index);
-          globalSource = { name: "global", label: TERRAIN.source, url: TERRAIN.url, available, minzoom: 0,
+          globalSource = { name: "global", label: TERRAIN.source, url: dataUrl(TERRAIN.url), available, minzoom: 0,
                            maxzoom: zoom[1], detail: 463, shareInBlue: false };
         }
       } catch (err) {
@@ -411,8 +413,7 @@ export function mountLayers(viewer, baseLayer, { blueMarbleProbe } = {}) {
     if (relief) relief.show = show;
   }
 
-  const terrainChecked = fetch(TERRAIN.index, { method: "HEAD" })
-    .then((r) => r.ok, () => false)
+  const terrainChecked = exists(TERRAIN.index)
     .then((ok) => {
       terrainBuilt = ok;
       render();
@@ -569,7 +570,7 @@ export function mountLayers(viewer, baseLayer, { blueMarbleProbe } = {}) {
   async function refresh() {
     let index = [];
     try {
-      const res = await fetch(`/tiles/landsat/index.json?t=${Date.now()}`);
+      const res = await dataFetch(`/tiles/landsat/index.json?t=${Date.now()}`);
       if (res.ok) index = (await res.json()).regions ?? [];
     } catch {}
     const names = new Set(index.map((r) => r.name));
@@ -586,7 +587,7 @@ export function mountLayers(viewer, baseLayer, { blueMarbleProbe } = {}) {
       const available = await availability(r);
       if (regions.get(r.name) !== entry) continue; // replaced while loading
       // (ImageryLayerCollection.add returns nothing, so keep our own reference to the layer)
-      entry.layer = regionLayer(r, { url: `${r.url}?b=${encodeURIComponent(r.built_utc)}`, available });
+      entry.layer = regionLayer(r, { url: dataUrl(`${r.url}?b=${encodeURIComponent(r.built_utc)}`), available });
       viewer.imageryLayers.add(entry.layer);
       apply(r.name);
     }
@@ -625,7 +626,7 @@ export function mountLayers(viewer, baseLayer, { blueMarbleProbe } = {}) {
 
   async function loadVector(v) {
     try {
-      const ds = await Cesium.GeoJsonDataSource.load(v.url);
+      const ds = await Cesium.GeoJsonDataSource.load(dataUrl(v.url));
       styleVector(v, ds);
       ds.show = isOn(v.name, v.defaultOn ?? true);
       vectorSources.set(v.name, ds);

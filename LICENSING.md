@@ -136,6 +136,8 @@ The app makes no requests to Cesium ion, Bing, Google or any other tile or terra
 
 `npm test` checks this automatically. It loads the production build in a browser, records every request, and **fails if any request leaves the app's own origin**. It also checks that the NASA credit and its terms link are on screen, that the ion logo isn't, that Cesium's licence ships, and that the moon texture doesn't. You can also look in the browser's Network tab yourself.
 
+**Optionally, your own map server.** Built with `VITE_MAP_SERVER_URL` set, the globe takes its map data from that server instead (the project's own, `npm run server:up`, serving these same files), and from nothing else; `npm run test:server` checks that. The **Data:** label under the Layers button says which it is.
+
 ### The map server
 
 The map server (`npm run server:up`) serves the same layers to other people's maps, so the conditions above travel with them. Its catalog and every TileJSON carry each layer's **attribution**, which Leaflet, MapLibre and OpenLayers show automatically. Its index page shows the snippet for each library with the attribution included. If you publish it, keep that attribution on the maps that use it, and don't present the layers as endorsed by NASA or USGS. `/licensing`, `/notice` and `/provenance/` serve this file, the NOTICE and every build record alongside the tiles.

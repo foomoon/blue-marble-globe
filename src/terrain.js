@@ -8,6 +8,7 @@
 // Antarctic plateau reaches the pole rather than dropping to sea level). Tiles the build didn't
 // write are all sea: height 0.
 import * as Cesium from "cesium";
+import { noteResponse } from "./data.js";
 
 const N = 65; // heights per side of a Cesium terrain tile
 const CACHE = 300; // decoded files kept (256 KB each)
@@ -200,7 +201,14 @@ export function reliefProvider(source, { strength = 2 } = {}) {
 }
 
 async function decode(href, shareInBlue) {
-  const res = await fetch(href);
+  let res;
+  try {
+    res = await fetch(href);
+    noteResponse(res.status < 500); // for the data source indicator
+  } catch (err) {
+    noteResponse(false);
+    throw err;
+  }
   if (!res.ok) throw new Error(`${res.status} ${href}`);
   // The colours are data, not a picture: no colour management, no premultiplied alpha
   const bitmap = await createImageBitmap(await res.blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" });

@@ -5,6 +5,8 @@ import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import { mountGuide } from "./guide.js";
 import { mountLayers } from "./layers.js";
+import { dataUrl, exists, reportingTiles } from "./data.js";
+import { mountDataSource } from "./datasource.js";
 import { mountCoords } from "./coords.js";
 
 // 0. No Cesium ion. Cesium puts an ion logo in the credit bar by default, even when
@@ -30,20 +32,22 @@ Cesium.Camera.prototype.rotate = function (axis, angle) {
   return cameraRotate.call(this, axis, angle);
 };
 
+// "Data: local" or "Data: map server", top right. First, before anything waits on the server.
+mountDataSource();
+
 // 1. Describe where the tiles live and how they were cut. Blue Marble is built as JPEG and,
 //    optionally, WebP (smaller): use WebP when it's there (npm run build:tiles -- --format webp).
 const BLUE_MARBLE = {
   webp: { url: "/tiles/blue-marble-webp/{z}/{x}/{y}.webp", probe: "/tiles/blue-marble-webp/0/0/0.webp" },
   jpeg: { url: "/tiles/blue-marble/{z}/{x}/{y}.jpg", probe: "/tiles/blue-marble/0/0/0.jpg" },
 };
-const blueMarbleFormat = (await fetch(BLUE_MARBLE.webp.probe, { method: "HEAD" }).then((r) => r.ok, () => false))
-  ? "webp" : "jpeg";
-const blueMarble = new Cesium.UrlTemplateImageryProvider({
-  url: BLUE_MARBLE[blueMarbleFormat].url, // public/tiles/blue-marble(-webp)/
+const blueMarbleFormat = (await exists(BLUE_MARBLE.webp.probe)) ? "webp" : "jpeg";
+const blueMarble = reportingTiles(new Cesium.UrlTemplateImageryProvider({
+  url: dataUrl(BLUE_MARBLE[blueMarbleFormat].url), // public/tiles/blue-marble(-webp)/, or a map server's
   tilingScheme: new Cesium.WebMercatorTilingScheme(), // gdal2tiles --xyz, EPSG:3857
   maximumLevel: 8, // highest zoom built by scripts/build_tiles.py
   credit: nasaCredit,
-});
+}));
 
 // 2. Create the viewer with that layer as the base map, and no UI chrome.
 const baseLayer = new Cesium.ImageryLayer(blueMarble);

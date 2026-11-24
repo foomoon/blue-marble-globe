@@ -143,3 +143,20 @@ test("CORS preflights, including Chrome's private-network check, are answered", 
   expectCors(res);
   expect(res.headers()["access-control-allow-private-network"]).toBe("true");
 });
+
+test("a globe set to use the map server (VITE_MAP_SERVER_URL) takes all its map data from it", async ({ page }) => {
+  const server = new URL(BASE).origin;
+  const fromServer = [], fromSite = [];
+  page.on("request", (r) => {
+    const u = new URL(r.url());
+    if (/^\/(tiles|vectors)\//.test(u.pathname)) (u.origin === server ? fromServer : fromSite).push(u.pathname);
+  });
+  await page.goto("http://localhost:5175/");
+  await page.waitForFunction(() => window.viewer?.scene.globe.tilesLoaded, null, { timeout: 60_000 });
+  const badge = page.locator(".data-source");
+  await expect(badge).toHaveText("Data: map server");
+  await expect(badge).toHaveAttribute("data-state", "online");
+  await expect(badge).toHaveAttribute("title", new RegExp(server));
+  expect(fromServer.length, "map data requests to the map server").toBeGreaterThan(10);
+  expect(fromSite, "map data requests to the globe's own site").toEqual([]);
+});

@@ -257,6 +257,16 @@ map.addSource("grey", { type: "raster", url: "http://localhost:8080/tiles/grey/t
 map.addLayer({ id: "grey", type: "raster", source: "grey" });
 ```
 
+**The globe can use it too.** By default the globe loads map data from its own site. Start or build it with the server's address, and it takes all of it (tiles, terrain, regions, lines) from the map server instead:
+
+```bash
+VITE_MAP_SERVER_URL=http://localhost:8080 npm run dev      # or ... npm run build
+```
+
+To make it stick on your machine, put the setting in `.env.local` (not committed; `.env.example` shows it), and restart `npm run dev`. Delete the file, or empty the value, to go back to local files. The tests always run on local files, whatever `.env.local` says.
+
+A label under the **Layers** and **Guide** buttons says where the data is coming from: **Data: local**, or **Data: map server**, with a green dot while the server answers its health check and red when it doesn't. Hover over it for the address.
+
 **How it works.** `scripts/build_server.py` reads the provenance records and writes the catalog, TileJSON and index page to `mapserver/www/` (gitignored). The container is plain nginx (`mapserver/`). The tiles, vectors and provenance are **mounted read-only, not copied**, so the image stays tiny and a rebuilt layer is live straight away. Any site may load the layers (CORS `*`, including Chrome's private-network preflight for LAN use). Tiles are cached for a day, and metadata is always revalidated.
 
 **Addresses.** URLs in the catalog and TileJSON are absolute, built from whatever address a client used (`localhost`, a LAN IP, a hostname). Behind a reverse proxy or CDN, publish one fixed address instead with `python3 scripts/build_server.py --base-url https://maps.example.com`. The proxy terminates TLS; the server honours `X-Forwarded-Proto`.

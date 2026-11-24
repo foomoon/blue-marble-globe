@@ -177,6 +177,10 @@ new ol.layer.Vector({
 
 **Grey has transparent water.** Give the map a dark background for the ocean (Grey's globe uses `#3b3f45`): Cesium's `globe.baseColor`, MapLibre's `background` layer, or CSS on Leaflet's or OpenLayers' map container.
 
+### This project's globe
+
+Set the server's address when starting or building the globe: `VITE_MAP_SERVER_URL=http://localhost:8080 npm run dev`. It then takes every tile, terrain tile, region and line from the server, and the **Data: map server** label (top right) shows a green dot while the server answers. Without the setting, it reads its own files: **Data: local**.
+
 ## 5. Running it beyond your machine
 
 - **Any site may load the layers.** The server sends CORS headers allowing every origin, and answers Chrome's private-network check, so pages on your LAN can use it.
