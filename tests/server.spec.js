@@ -154,7 +154,7 @@ test("a globe set to use the map server (VITE_MAP_SERVER_URL) takes all its map 
   await page.goto("http://localhost:5175/");
   await page.waitForFunction(() => window.viewer?.scene.globe.tilesLoaded, null, { timeout: 60_000 });
   const badge = page.locator(".data-source");
-  await expect(badge).toHaveText("Data: map server");
+  await expect(badge).toHaveText("Server");
   await expect(badge).toHaveAttribute("data-state", "online");
   await expect(badge).toHaveAttribute("title", new RegExp(server));
   expect(fromServer.length, "map data requests to the map server").toBeGreaterThan(10);
@@ -169,10 +169,103 @@ test("the map server serves the globe at /globe/, which takes everything from th
   await page.goto(url("/globe/"));
   await page.waitForFunction(() => window.Cesium && document.querySelector(".cesium-widget canvas"), null, { timeout: 60_000 });
   const badge = page.locator(".data-source");
-  await expect(badge).toHaveText("Data: this server");
+  await expect(badge).toHaveText("Server");
   await expect(badge).toHaveAttribute("data-state", "online");
   await expect(page.locator(".cesium-widget-credits")).toContainText("NASA Earth Observatory");
   expect([...origins], "everything from the map server itself").toEqual([new URL(BASE).origin]);
   // And the home page links to it
   expect(await (await request.get(url("/"))).text()).toContain("Open the globe");
+});
+
+test("the admin page and its API need a signed-in session", async ({ request }) => {
+  const admin = await request.get(url("/admin/"), { maxRedirects: 0 });
+  expect(admin.status()).toBe(302);
+  expect(admin.headers().location).toBe(`${new URL(BASE).origin}/login/?next=/admin/`);
+  expect((await request.get(url("/api/regions"))).status()).toBe(401);
+  expect((await request.get(url("/login/"))).status()).toBe(200);
+  // A made-up session cookie doesn't get in
+  const forged = await request.get(url("/api/regions"), { headers: { Cookie: "mapserver_session=admin.9999999999.AAAA" } });
+  expect(forged.status()).toBe(401);
+  // Nor a sign-in from another site
+  const evil = await request.post(url("/auth/login"), { headers: { Origin: "http://evil.example" }, data: {} });
+  expect(evil.status()).toBe(403);
+});
+
+// The rest needs the login: MAPSERVER_ADMIN=user:password npm run test:server
+const ADMIN = process.env.MAPSERVER_ADMIN?.match(/^([^:]+):(.+)$/);
+
+test.describe("admin page (signed in)", () => {
+  test.skip(!ADMIN, "set MAPSERVER_ADMIN=user:password to test the admin page");
+
+  test("signing in on the sign-in page leads to the admin page; signing out ends it", async ({ page }) => {
+    const origins = new Set();
+    page.on("request", (r) => r.url().startsWith("http") && origins.add(new URL(r.url()).origin));
+    await page.goto(url("/admin/"));
+    await expect(page).toHaveURL(/\/login\/\?next=%2Fadmin%2F|\/login\/\?next=\/admin\//);
+    await page.getByLabel("Username").fill(ADMIN[1]);
+    await page.getByLabel("Password").fill("wrong password here");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.locator(".message")).toHaveText("Wrong username or password.");
+    await page.getByLabel("Password").fill(ADMIN[2]);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(url("/admin/"));
+    await page.getByRole("button", { name: "Regions" }).click();
+    await expect(page.locator(".studio-badge")).toHaveText("admin");
+    await expect(page.locator(".studio-list")).toContainText("Guam");
+    await expect(page.locator(".data-source")).toHaveText("Server");
+    expect([...origins]).toEqual([new URL(BASE).origin]);
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await expect(page).toHaveURL(/\/login\//);
+    expect((await page.request.get(url("/api/regions"))).status()).toBe(401);
+  });
+
+  test("saving and deleting a region goes through to the builder", async ({ request }) => {
+    const origin = new URL(BASE).origin;
+    const signin = await request.post(url("/auth/login"), { headers: { Origin: origin }, data: { username: ADMIN[1], password: ADMIN[2] } });
+    expect(signin.status()).toBe(200);
+    const headers = { Origin: origin };
+    const name = "server-test-region";
+    const put = await request.put(url(`/api/regions/${name}`), {
+      headers,
+      data: { bbox: [-105.3, 39.98, -105.2, 40.05], dates: ["2023-06-01", "2024-09-30"], months: [7], max_cloud_percent: 20, zoom: [10, 12] },
+    });
+    expect(put.status()).toBe(200);
+    expect(existsSync(`regions/${name}.json`), "written to the project by the builder").toBe(true);
+    const list = await (await request.get(url("/api/regions"))).json();
+    expect(list.regions.map((r) => r.name)).toContain(name);
+    expect((await request.delete(url(`/api/regions/${name}`), { headers })).status()).toBe(200);
+    expect(existsSync(`regions/${name}.json`)).toBe(false);
+    // And it still refuses another site, signed in or not
+    const evil = await request.put(url(`/api/regions/${name}`), { headers: { Origin: "http://evil.example" }, data: {} });
+    expect(evil.status()).toBe(403);
+  });
+});
+
+test("the public globe has an Admin pill that leads to the sign-in page", async ({ page }) => {
+  await page.goto(url("/globe/"));
+  await expect(page.getByRole("button", { name: "Regions" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Admin" }).click();
+  await expect(page).toHaveURL(/\/login\/\?next=\/admin\//);
+});
+
+test("the server light turns red when the server stops answering, and green again when it's back", async ({ page }) => {
+  await page.goto(url("/globe/"));
+  const light = page.locator(".data-source");
+  await expect(light).toHaveText("Server");
+  await expect(light).toHaveAttribute("data-state", "online");
+  // The server goes quiet (for this page only: the requests are dropped in the browser)
+  await page.route(/\/(healthz|tiles\/|vectors\/)/, (route) => route.abort("connectionrefused"));
+  const zoomIn = async () => {
+    await page.mouse.move(640, 360);
+    for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -500), await page.waitForTimeout(150); // new tiles needed
+  };
+  await zoomIn();
+  await expect(light).toHaveText("Server offline", { timeout: 15000 });
+  await expect(light).toHaveAttribute("data-state", "offline");
+  // It's back: the next tiles that arrive light it green, no need to wait for the 30 s check
+  await page.unroute(/\/(healthz|tiles\/|vectors\/)/);
+  await page.mouse.move(640, 360), await page.mouse.down(), await page.mouse.move(300, 200, { steps: 8 }), await page.mouse.up();
+  await zoomIn();
+  await expect(light).toHaveText("Server", { timeout: 15000 });
+  await expect(light).toHaveAttribute("data-state", "online");
 });

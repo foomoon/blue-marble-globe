@@ -52,6 +52,22 @@
   color: #ffd27c;
   font-size: 11px;
 }
+.studio-signout {
+  margin-left: auto;
+  padding: 3px 9px;
+  border: 1px solid var(--guide-line);
+  border-radius: 6px;
+  background: none;
+  color: var(--guide-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.studio-signout:hover {
+  color: var(--guide-fg);
+}
+.studio-signout + .studio-close {
+  margin-left: 0;
+}
 .studio-close {
   margin-left: auto;
   width: 28px;

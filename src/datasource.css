@@ -1,4 +1,4 @@
-/* "Data: local" / "Data: map server", top right, under the Layers and Guide buttons */
+/* The map server's status light, top right, under the Layers and Guide buttons */
 .data-source {
   position: absolute;
   top: 56px;
@@ -19,14 +19,35 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #9aa4b2; /* local, or checking */
+  background: #9aa4b2; /* checking */
 }
 .data-source[data-state="online"] i {
   background: #5fd38a;
+  box-shadow: 0 0 6px rgba(95, 211, 138, 0.7); /* lit */
 }
 .data-source[data-state="offline"] i {
   background: #ff6b6b;
+  box-shadow: 0 0 6px rgba(255, 107, 107, 0.7);
 }
 .data-source[data-state="offline"] {
   color: #ffb3b3;
+}
+
+/* The public globe on the map server (/globe/): "Admin", where the admin page's Regions button is */
+.admin-link {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  padding: 7px 14px;
+  border: 1px solid var(--guide-line, rgba(255, 255, 255, 0.1));
+  border-radius: 999px;
+  background: var(--guide-bg, rgba(12, 18, 28, 0.88));
+  color: var(--guide-fg, #e6e9ee);
+  font: 500 13px var(--guide-font, system-ui, sans-serif);
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+}
+.admin-link:hover {
+  border-color: #ffd27c;
 }

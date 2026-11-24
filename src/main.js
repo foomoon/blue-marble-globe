@@ -5,7 +5,7 @@ import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import { mountGuide } from "./guide.js";
 import { mountLayers } from "./layers.js";
-import { dataUrl, exists, reportingTiles } from "./data.js";
+import { dataUrl, exists, reportingTiles, servedByMapServer } from "./data.js";
 import { mountDataSource } from "./datasource.js";
 import { mountCoords } from "./coords.js";
 
@@ -85,9 +85,16 @@ viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpace
 const layers = mountLayers(viewer, baseLayer, { blueMarbleProbe: BLUE_MARBLE[blueMarbleFormat].probe });
 coords.setTerrain(layers.terrainAt);
 
-// 6. Dev only: the Regions studio (draw, estimate, save and build regions).
-//    Vite removes this branch from production builds, so the deployed globe never has it.
-if (import.meta.env.DEV) {
+// 6. Dev and the map server's admin page (/admin/) only: the Regions studio (draw, estimate, save
+//    and build regions). Vite removes this branch from other builds, so the public globe never has it.
+if (import.meta.env.DEV || import.meta.env.VITE_ADMIN === "1") {
   Object.assign(window, { viewer, Cesium }); // handy in the browser console while developing
   import("./studio/studio.js").then(({ mountStudio }) => mountStudio(viewer, layers));
+}
+// The public globe the map server serves (/globe/): where the Regions button would be, a link to
+// the admin page, where regions are added (it asks you to sign in).
+else if (servedByMapServer) {
+  const admin = Object.assign(document.createElement("a"), { className: "admin-link", href: "../admin/", textContent: "Admin" });
+  admin.title = "Add and build high-resolution regions (sign-in required)";
+  document.body.append(admin);
 }

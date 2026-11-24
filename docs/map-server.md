@@ -185,6 +185,18 @@ new ol.layer.Vector({
 
 **Or run it separately** and point it at the server: set the server's address when starting or building the globe: `VITE_MAP_SERVER_URL=http://localhost:8080 npm run dev`. It then takes every tile, terrain tile, region and line from the server, and the **Data: map server** label (top right) shows a green dot while the server answers. Without the setting, it reads its own files: **Data: local**.
 
+### The admin page: building regions on the server
+
+http://localhost:8080/admin/ is the globe with the **Regions** panel: draw a region, build it, watch it come in. Set its login once with `npm run server:password`, **in a terminal** (a username and a 12+ character password). Visiting `/admin/` then shows the app's own **sign-in page** (`/login/`); once signed in you stay signed in for 12 hours, or until **Sign out** in the Regions panel. Without a login set up, nobody can sign in.
+
+How it's protected:
+
+- **The password** is stored as a salted scrypt hash in `mapserver/auth/users` (not committed, readable only by you). Changing it applies at once and signs everyone out.
+- **Sessions** are a signed cookie (HttpOnly, SameSite=Strict, and Secure behind HTTPS). nginx asks the builder to check it (`auth_request`) on every request to `/admin/` and `/api/`: pages without a valid session go to the sign-in page, API calls get 401.
+- **Guessing** is slowed: each wrong password waits about a second, and nginx allows 10 attempts a minute per address (then 429).
+
+Builds run in the **builder** container (`mapserver/builder/Dockerfile`): GDAL, Python, numpy and Node, with the region build scripts and the Regions API (`server/admin-api.js`) mounted from the project. nginx passes `/api/` and `/auth/` to it, the first only with a signed-in session; it's not reachable any other way. It writes regions, tiles, provenance and the catalog into the project, owned by you; it's limited to 4 CPUs and 6 GB of memory by default (`BUILDER_CPUS`, `BUILDER_MEMORY`). If it's stopped, the map server carries on serving; only the admin page's API stops answering.
+
 ## 5. Running it beyond your machine
 
 - **Any site may load the layers.** The server sends CORS headers allowing every origin, and answers Chrome's private-network check, so pages on your LAN can use it.
@@ -196,6 +208,7 @@ new ol.layer.Vector({
   ```
 
   Let the proxy handle HTTPS; the server honours its `X-Forwarded-Proto` header.
+- **The admin page over the network:** on anything but your own network, put the server behind HTTPS (a reverse proxy, as above, sending `X-Forwarded-Proto: https`), or the password and session cookie travel unencrypted.
 - **Copying the tiles to another machine:** use `rsync -aH` (or `cp -a`, or `tar`), which keeps hard links. Grey stores its identical tiles once as hard links; a plain copy expands it from ~150 MB to ~620 MB.
 - **Caching.** Tiles are cached for a day. The catalog and TileJSON are always revalidated, so a refreshed catalog shows up immediately.
 

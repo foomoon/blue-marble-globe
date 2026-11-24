@@ -1,4 +1,5 @@
-# Map server: serves the layers built in this project to other web maps.
+# Map server: serves the layers built in this project to other web maps, the globe at /globe/,
+# and the admin page at /admin/ (behind its sign-in page, /login/), whose builds run in the builder container.
 #   npm run server:up      generate metadata, then start on http://localhost:8080
 #   npm run server:down    stop it
 services:
@@ -10,9 +11,32 @@ services:
     volumes:
       - ./mapserver/www:/srv/www:ro          # catalog, TileJSON, index (scripts/build_server.py)
       - ./mapserver/globe:/srv/globe:ro      # the globe, at /globe/ (npm run server:globe)
+      - ./mapserver/admin:/srv/admin:ro      # the admin page, at /admin/ (npm run server:admin)
+      - ./mapserver/login:/srv/login:ro      # its sign-in page, at /login/
       - ./public/tiles:/srv/tiles:ro         # Blue Marble, Grey, Landsat regions
       - ./public/vectors:/srv/vectors:ro     # GeoJSON layers
       - ./provenance:/srv/provenance:ro      # checksums, build records, archived terms
       - ./LICENSING.md:/srv/docs/LICENSING.md:ro
       - ./NOTICE:/srv/docs/NOTICE:ro
+    restart: unless-stopped
+
+  # Builds for the admin page: GDAL, Python, numpy and Node. Not published on any port: nginx
+  # passes /api/ (signed-in only) and /auth/ (the sign-in) to it. Writes only the data folders.
+  builder:
+    build: ./mapserver/builder
+    image: blue-marble-globe/builder
+    init: true                                 # reaps build processes, passes signals on
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}" # files it writes belong to you, not root
+    cpus: ${BUILDER_CPUS:-4}                   # so a build can't starve the map server
+    mem_limit: ${BUILDER_MEMORY:-6g}
+    volumes:
+      - ./server:/project/server:ro
+      - ./scripts:/project/scripts:ro
+      - ./regions:/project/regions               # region configs
+      - ./provenance:/project/provenance         # build records
+      - ./public:/project/public                 # tiles (and the vectors, read)
+      - ./data:/project/data                     # scratch space for builds
+      - ./mapserver/www:/project/mapserver/www   # the catalog, refreshed after each build
+      - ./mapserver/globe:/project/mapserver/globe:ro
+      - ./mapserver/auth:/project/mapserver/auth:ro  # the admin login it checks (npm run server:password)
     restart: unless-stopped

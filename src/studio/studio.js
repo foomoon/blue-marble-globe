@@ -87,12 +87,23 @@ export function mountStudio(viewer, layers) {
     return layer;
   }
 
+  // On the map server's admin page, the API needs a signed-in session: if it has expired,
+  // go to the sign-in page, and come back here afterwards.
+  const ADMIN = !import.meta.env.DEV;
+  const toSignIn = () => location.assign(`/login/?next=${encodeURIComponent(location.pathname)}`);
+  const api = (url, init) =>
+    fetch(url, init).then((res) => {
+      if (ADMIN && res.status === 401) toSignIn();
+      return res;
+    });
+
   // ---- Panel ----
   const toggle = el("button", "studio-toggle", "Regions");
   const panel = el("aside", "studio-panel");
   panel.hidden = true;
   panel.innerHTML = `
-    <header class="studio-header"><strong>Regions</strong><span class="studio-badge">dev only</span>
+    <header class="studio-header"><strong>Regions</strong><span class="studio-badge">${import.meta.env.DEV ? "dev only" : "admin"}</span>
+      ${import.meta.env.DEV ? "" : '<button class="studio-signout">Sign out</button>'}
       <button class="studio-close" aria-label="Close regions">×</button></header>
     <div class="studio-body">
       <section class="studio-job" hidden>
@@ -172,6 +183,10 @@ export function mountStudio(viewer, layers) {
 
   toggle.addEventListener("click", () => setOpen(panel.hidden));
   $(".studio-close").addEventListener("click", () => setOpen(false));
+  $(".studio-signout")?.addEventListener("click", async () => {
+    await fetch("/auth/logout", { method: "POST" }).catch(() => {});
+    toSignIn();
+  });
   drawBtn.addEventListener("click", () => {
     if (drawing) return setDrawing(false);
     // A new region always starts from a blank form, never from the one being edited
@@ -228,7 +243,7 @@ export function mountStudio(viewer, layers) {
       return null;
     }
     status("Saving…");
-    const res = await fetch(`/api/regions/${encodeURIComponent(draft.name)}`, {
+    const res = await api(`/api/regions/${encodeURIComponent(draft.name)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(draft),
@@ -383,7 +398,7 @@ export function mountStudio(viewer, layers) {
 
   // ---- Saved regions + their built layers ----
   async function loadSaved() {
-    const res = await fetch("/api/regions");
+    const res = await api("/api/regions");
     saved = (await res.json()).regions;
     savedSource.entities.removeAll();
 
@@ -443,7 +458,7 @@ export function mountStudio(viewer, layers) {
           setTimeout(() => ((del.dataset.armed = ""), (del.textContent = "Delete")), 3000);
           return;
         }
-        await fetch(`/api/regions/${encodeURIComponent(r.name)}`, { method: "DELETE" });
+        await api(`/api/regions/${encodeURIComponent(r.name)}`, { method: "DELETE" });
         await loadSaved();
       });
       list.append(li);
@@ -459,7 +474,7 @@ export function mountStudio(viewer, layers) {
     if (!job) return;
     $(".job-cancel").disabled = true;
     $(".job-message").textContent = "Cancelling…";
-    await fetch(`/api/jobs/${job.id}/cancel`, { method: "POST" });
+    await api(`/api/jobs/${job.id}/cancel`, { method: "POST" });
   });
   $(".job-logtoggle").addEventListener("click", (e) => {
     logBox.hidden = !logBox.hidden;
@@ -472,7 +487,7 @@ export function mountStudio(viewer, layers) {
   });
 
   async function startBuild(name) {
-    const res = await fetch(`/api/regions/${encodeURIComponent(name)}/build`, { method: "POST" });
+    const res = await api(`/api/regions/${encodeURIComponent(name)}/build`, { method: "POST" });
     const body = await res.json();
     if (!res.ok && !body.job) return status(body.error, true);
     watch(body.job); // on 409 this attaches to the build already running
@@ -671,7 +686,7 @@ export function mountStudio(viewer, layers) {
   updateHint();
   savedSource.show = false;
   loadSaved()
-    .then(() => fetch("/api/jobs/current"))
+    .then(() => api("/api/jobs/current"))
     .then((r) => r.json())
     .then(({ job: current }) => current?.state === "running" && watch(current))
     .catch((err) => status(`Couldn't load regions: ${err.message}`, true));

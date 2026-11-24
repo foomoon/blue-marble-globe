@@ -60,7 +60,10 @@ const liveTiles = {
 // serves /tiles and /vectors); settings from .env.mapserver, which outrank .env.local.
 export default defineConfig(({ mode }) => ({
   plugins: [cesium(), licenceHygiene, studio(), liveTiles],
-  ...(mode === "mapserver" ? { base: "./", publicDir: false, build: { outDir: "mapserver/globe", emptyOutDir: true } } : {}),
+  // `--mode admin` (npm run server:admin): the same, plus the Regions panel, for /admin/
+  ...(mode === "mapserver" || mode === "admin"
+    ? { base: "./", publicDir: false, build: { outDir: mode === "admin" ? "mapserver/admin" : "mapserver/globe", emptyOutDir: true } }
+    : {}),
   server: {
     watch: {
       // Hundreds of thousands of tiles, and multi-GB sources: nothing there is code, and watching

@@ -4,6 +4,14 @@ A clean CesiumJS globe on self-hosted NASA Blue Marble tiles. It needs no API ke
 
 ![The globe on Blue Marble, with country borders and US states](docs/images/globe-blue-marble.jpg)
 
+**Using it** (once set up, below), all from the map server on your machine:
+
+| | |
+| --- | --- |
+| **The globe** | http://localhost:8080/globe/ |
+| **Add a high-resolution region** | http://localhost:8080/admin/ (sign in, then **Regions**): see [Higher-resolution regions](#higher-resolution-regions) |
+| **The layers, for other web maps** | http://localhost:8080/: previews, TileJSON, code |
+
 - **How to build the map data:** [docs/building-the-tiles.md](docs/building-the-tiles.md)
 - **How to add imagery and vector layers in code:** [docs/adding-a-map-layer.md](docs/adding-a-map-layer.md)
 - **Why no licence is needed:** [LICENSING.md](LICENSING.md), backed by archived copies of [NASA's usage guidelines](provenance/terms/nasa-images-and-media-guidelines.md)
@@ -29,9 +37,12 @@ npm install
 npm run fetch:source   # ~3 GB from NASA, checksums verified against provenance/sources.json
 npm run build:tiles    # Blue Marble: ~156 MB of WebP tiles into public/tiles/blue-marble-webp/, zoom 0-8 (--format jpeg for JPEG)
 npm run build:grey     # optional: the Grey base map (~6 min, ~150 MB on disk)
-npm run build:terrain  # optional: global terrain from NOAA (5.2 GB download, ~13 min: 8½ to download, 4 to build; needs .venv, see Regions setup)
-npm run dev
+npm run build:terrain  # optional: global terrain from NOAA (5.2 GB download, ~13 min: 8½ to download, 4 to build; needs .venv)
+npm run server:password  # in a terminal: choose the admin login (for adding regions)
+npm run server:up      # build and start the map server (Docker): the globe, the admin page, the layers
 ```
+
+Then open http://localhost:8080/globe/. **Working on the app's code?** `npm run dev` runs it from source with instant reload, at http://localhost:5173, Regions panel included.
 
 The vector layers (borders, states, coastlines) are already in the repo; `npm run fetch:vectors` regenerates them. **[docs/building-the-tiles.md](docs/building-the-tiles.md)** explains every build step, and is also the Guide's "Build the map data" tab.
 
@@ -97,9 +108,9 @@ The **Guide** button opens the project's own docs inside the app: *Build the map
 
 ![The Guide panel open on "Add layers in code"](docs/images/guide.jpg)
 
-## Higher-resolution regions (dev only)
+## Higher-resolution regions
 
-Blue Marble is 500 m per pixel. For a sharper view of a particular place, draw a **region** and the app builds a **30 m Landsat 8/9 layer** for it on your machine: sixteen times sharper, from free public-domain USGS imagery. This happens in the **Regions** panel, which only exists under `npm run dev`.
+Blue Marble is 500 m per pixel. For a sharper view of a particular place, draw a **region** and the app builds a **30 m Landsat 8/9 layer** for it on your machine: sixteen times sharper, from free public-domain USGS imagery. **Where:** the map server's admin page, **http://localhost:8080/admin/**. Sign in, then press **Regions** (top left). Builds run in the map server's builder container, so nothing but Docker is needed; a finished region appears straight away on the globe (`/globe/`), on the admin page, and in the map server's catalog for other web maps.
 
 <p>
   <img src="docs/images/regions-studio.jpg" width="49%" alt="The Regions panel with saved regions, over Guam">
@@ -108,18 +119,20 @@ Blue Marble is 500 m per pixel. For a sharper view of a particular place, draw a
 
 ### Before you start (once)
 
-Region and terrain builds use Python with GDAL's bindings and numpy, in the project's own virtual environment. On **Ubuntu**, `scripts/setup-ubuntu.sh` creates it, using Ubuntu's `python3-gdal` and `python3-numpy`. Don't pip-install numpy into it there: GDAL's bindings are built against Ubuntu's numpy. On **macOS** (Homebrew's numpy can be broken, so the project brings its own):
+1. **The map server is running:** `npm run server:up` (needs Docker).
+2. **You have an admin login:** run `npm run server:password` **in a terminal** (it asks for a username and a 12+ character password; Claude Code's `!` prompt can't pass typed input). Change it the same way any time.
+3. **An internet connection:** the Landsat imagery and elevation data are read from Microsoft Planetary Computer. No account or API key.
+
+**Or on your own machine instead,** while working on the code: `npm run dev` has the same Regions panel at http://localhost:5173, and builds run with your own Python, GDAL and numpy, in the project's `.venv`. On Ubuntu, `scripts/setup-ubuntu.sh` sets that up. On macOS (Homebrew's numpy can be broken, so the project brings its own):
 
 ```bash
 python3 -m venv --system-site-packages .venv   # keeps access to GDAL's Python bindings
 .venv/bin/pip install --ignore-installed -r scripts/requirements.txt
 ```
 
-You also need GDAL (see Quick start) and an internet connection. No account or API key is needed.
-
 ### 1. Draw the area
 
-Run `npm run dev` and press **Regions** (top left). Choose a shape, press **New region**, and draw on the globe:
+Open http://localhost:8080/admin/, sign in, and press **Regions** (top left). Choose a shape, press **New region**, and draw on the globe:
 
 - **Rectangle:** drag. The camera is locked while you draw.
 - **Polygon:** click each corner. You can still move the globe between clicks. To finish, double-click, press **Enter**, or click the first corner. **Backspace** removes the last corner, **Esc** cancels.
@@ -149,7 +162,7 @@ When you finish drawing, a form opens. Its tile table updates as you change the 
 
 ### 3. Save & build
 
-**Save** only writes the config. **Save & build** also starts the build. The build runs on your machine, started by the dev server, and you can watch it:
+**Save** only writes the config. **Save & build** also starts the build. It runs in the map server's builder container (or, under `npm run dev`, on your machine), and you can watch it:
 
 ![A build in progress: the progress card, and the Landsat scenes' footprints around the region](docs/images/region-3-building.jpg)
 
@@ -180,9 +193,9 @@ When the build finishes, the region appears on the globe automatically, here as 
 - **Click a region's name** in the panel to fly to it. Click **Edit** to change its settings, and **Redraw area** to reshape it.
 - **Build** or **Rebuild** builds it again with its current settings. One build runs at a time.
 - **Delete** (click again to confirm) removes the config only. To remove a region's layer too, delete `public/tiles/landsat/<name>/` and its provenance file, then run `npm run build:region -- --index` to update the layer list.
-- **From the terminal:** `npm run build:region -- regions/<name>.json` builds a saved region and prints progress as JSON lines.
+- **From the terminal:** `npm run build:region -- regions/<name>.json` builds a saved region with your own Python (the `.venv` above) and prints progress as JSON lines. Or, with only Docker: `docker compose exec builder python3 scripts/build_region.py regions/<name>.json`.
 
-The panel and its API exist only in the dev server. `npm run build` leaves both out, so the deployed globe is view-only. The API also refuses requests from any page other than the app's own.
+The panel and its API exist only in the dev server and the map server's admin page. `npm run build` and the map server's public `/globe/` leave both out, so those are view-only. The API also refuses requests from any page other than the app's own, and on the map server it needs a signed-in session.
 
 ### How it works
 
@@ -258,6 +271,19 @@ map.addLayer({ id: "grey", type: "raster", source: "grey" });
 ```
 
 **The map server serves the globe too**, at **http://localhost:8080/globe/** (linked from its home page): the same app, on the same address as its data, so it needs no settings and no cross-origin rules, and anyone who can reach the server can use it. `npm run server:up` builds it (`npm run server:globe` on its own: a production build into `mapserver/globe/`, without the tiles, which the server already has). Its label says **Data: this server**. It's the viewer only: the Regions panel stays in `npm run dev`.
+
+**The admin page** is the globe plus the **Regions** panel, at **http://localhost:8080/admin/**, behind the app's own sign-in page. Region builds started there run in a second container, the **builder** (GDAL 3.13.3, Python, numpy and Node, from OSGeo's official image), so the map server's machine needs nothing but Docker:
+
+```bash
+npm run server:password   # once, in a terminal: choose the admin username and password (stored hashed, not committed)
+npm run server:up         # builds the globe, the admin page and both images, then starts both containers
+```
+
+- **nginx stays the only way in.** It serves maps and the globe publicly, and lets `/admin/` and `/api/` through only with a signed-in session (a 12-hour cookie; **Sign out** in the Regions panel ends it). The builder isn't published on any port.
+- **The builder writes only the data folders** (regions, tiles, provenance, scratch space and the catalog), as you, not root. nginx keeps read-only access to everything.
+- **Builds can't starve the map server:** the builder is capped at 4 CPUs and 6 GB of memory (`BUILDER_CPUS`, `BUILDER_MEMORY` to change).
+- **Finished regions appear straight away** on the globe, the admin page, the home page and the catalog.
+- **Images:** builder about 820 MB, map server about 90 MB. A machine that only serves maps can run just the map server.
 
 **A separately run globe can use the server too.** By default the globe loads map data from its own site. Start or build it with the server's address, and it takes all of it (tiles, terrain, regions, lines) from the map server instead:
 

@@ -293,11 +293,10 @@ test("zooming with the cursor on the exact centre pixel doesn't stop rendering (
   await expect(page.locator(".coords")).not.toContainText("NaN");
 });
 
-test("data source indicator: the production build reads its own files", async ({ page }) => {
+test("server status light: none when the globe reads its own files", async ({ page }) => {
   await page.goto("/");
-  const badge = page.locator(".data-source");
-  await expect(badge).toHaveText("Data: local");
-  await expect(badge).toHaveAttribute("data-state", "local");
+  await expect(page.locator(".coords")).toBeVisible(); // the app has started
+  await expect(page.locator(".data-source")).toHaveCount(0);
 });
 
 test("lat/lon/alt readout follows the cursor and falls back to the view centre; terrain source above it", async ({ page }) => {

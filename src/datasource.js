@@ -1,5 +1,7 @@
-// Where the map data comes from, shown top right under Layers/Guide: this site's own files, or a
-// map server (VITE_MAP_SERVER_URL), with a dot for whether that server is answering. The dot
+// The map server's status light, top right under Layers/Guide: green "Server" while the server the
+// map data comes from is answering, red "Server offline" when it isn't. Shown only when there is a
+// map server: the globe it serves (/globe/, /admin/), or one pointed at one (VITE_MAP_SERVER_URL);
+// a globe on its own site's files has nothing to watch. The light
 // follows the data requests themselves: a tile or file that arrives proves the server is up (green,
 // no extra request); one that fails prompts a health check straight away. A health check also runs
 // every 30 s, for when nothing is loading, and gives up after 4 s: a paused server just hangs.
@@ -19,17 +21,15 @@ export function mountDataSource(parent = document.body) {
   parent.append(badge);
 
   if (!mapServer && !servedByMapServer) {
-    badge.dataset.state = "local";
-    text.textContent = "Data: local";
-    badge.title = "Map data comes straight from this site's own files (public/tiles and public/vectors).";
+    badge.remove(); // map data from this site's own files: no server to watch
     return;
   }
 
-  // Served by the map server itself (/globe/), or pointed at one (VITE_MAP_SERVER_URL)
-  text.textContent = servedByMapServer ? "Data: this server" : "Data: map server";
+  text.textContent = "Server";
   const where = servedByMapServer ? `this map server (${location.origin})` : `the map server at ${mapServer}`;
   const show = (ok, how) => {
     badge.dataset.state = ok ? "online" : "offline";
+    text.textContent = ok ? "Server" : "Server offline";
     badge.title = `Map data comes from ${where}. ` +
       (ok ? "It's answering" : "It isn't answering: is it running (npm run server:up) and not paused in Docker? Or check the address") +
       ` (${how}, ${new Date().toLocaleTimeString()}).`;

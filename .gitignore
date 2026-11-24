@@ -20,6 +20,9 @@ __pycache__/
 mapserver/www/
 # The globe the map server serves at /globe/ (npm run server:globe)
 mapserver/globe/
+# The admin page (npm run server:admin) and its password file (npm run server:password)
+mapserver/admin/
+mapserver/auth/
 
 # Your own settings for Vite, e.g. VITE_MAP_SERVER_URL (see .env.example)
 .env.local
