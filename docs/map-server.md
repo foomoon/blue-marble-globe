@@ -181,7 +181,9 @@ new ol.layer.Vector({
 
 ### This project's globe
 
-Set the server's address when starting or building the globe: `VITE_MAP_SERVER_URL=http://localhost:8080 npm run dev`. It then takes every tile, terrain tile, region and line from the server, and the **Data: map server** label (top right) shows a green dot while the server answers. Without the setting, it reads its own files: **Data: local**.
+**It's on the server:** http://localhost:8080/globe/, built by `npm run server:up` (or `npm run server:globe`). Same address as the data, so it just works; its label says **Data: this server**.
+
+**Or run it separately** and point it at the server: set the server's address when starting or building the globe: `VITE_MAP_SERVER_URL=http://localhost:8080 npm run dev`. It then takes every tile, terrain tile, region and line from the server, and the **Data: map server** label (top right) shows a green dot while the server answers. Without the setting, it reads its own files: **Data: local**.
 
 ## 5. Running it beyond your machine
 

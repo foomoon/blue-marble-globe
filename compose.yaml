@@ -9,6 +9,7 @@ services:
       - "${MAPSERVER_PORT:-8080}:8080"
     volumes:
       - ./mapserver/www:/srv/www:ro          # catalog, TileJSON, index (scripts/build_server.py)
+      - ./mapserver/globe:/srv/globe:ro      # the globe, at /globe/ (npm run server:globe)
       - ./public/tiles:/srv/tiles:ro         # Blue Marble, Grey, Landsat regions
       - ./public/vectors:/srv/vectors:ro     # GeoJSON layers
       - ./provenance:/srv/provenance:ro      # checksums, build records, archived terms

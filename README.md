@@ -257,7 +257,9 @@ map.addSource("grey", { type: "raster", url: "http://localhost:8080/tiles/grey/t
 map.addLayer({ id: "grey", type: "raster", source: "grey" });
 ```
 
-**The globe can use it too.** By default the globe loads map data from its own site. Start or build it with the server's address, and it takes all of it (tiles, terrain, regions, lines) from the map server instead:
+**The map server serves the globe too**, at **http://localhost:8080/globe/** (linked from its home page): the same app, on the same address as its data, so it needs no settings and no cross-origin rules, and anyone who can reach the server can use it. `npm run server:up` builds it (`npm run server:globe` on its own: a production build into `mapserver/globe/`, without the tiles, which the server already has). Its label says **Data: this server**. It's the viewer only: the Regions panel stays in `npm run dev`.
+
+**A separately run globe can use the server too.** By default the globe loads map data from its own site. Start or build it with the server's address, and it takes all of it (tiles, terrain, regions, lines) from the map server instead:
 
 ```bash
 VITE_MAP_SERVER_URL=http://localhost:8080 npm run dev      # or ... npm run build

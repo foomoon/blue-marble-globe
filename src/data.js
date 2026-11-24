@@ -12,12 +12,16 @@ export const dataUrl = (path) => (SERVER && /^\/(tiles|vectors)\//.test(path) ? 
 /** The map server in use, or "" for the globe's own site. */
 export const mapServer = SERVER;
 
+/** Whether this globe is the one the map server itself serves (at /globe/): its own site *is* the
+ * map server, so data comes from there without an address. */
+export const servedByMapServer = import.meta.env.VITE_SERVED_BY_MAP_SERVER === "1";
+
 /**
  * Tell the data source indicator how a request to the map server went: true when it answered
  * (any HTTP status: it's up), false when it didn't (a network error). Nothing to tell for local files.
  */
 export function noteResponse(ok) {
-  if (SERVER) document.dispatchEvent(new CustomEvent("data:response", { detail: { ok } }));
+  if (SERVER || servedByMapServer) document.dispatchEvent(new CustomEvent("data:response", { detail: { ok } }));
 }
 
 const TIMEOUT_MS = 8_000;

@@ -7,17 +7,21 @@ import studio from "./server/studio.js";
 // After the build: leave out Cesium's moon texture, whose source isn't documented as
 // public domain (the app never draws the moon; see src/main.js), and ship Cesium's
 // Apache-2.0 licence with its runtime. See LICENSING.md.
+let outDir = "dist";
 const licenceHygiene = {
   name: "licence-hygiene",
   apply: "build",
   enforce: "post",
+  configResolved(config) {
+    outDir = config.build.outDir; // dist/, or mapserver/globe/ for the map server's copy
+  },
   closeBundle: {
     order: "post",
     sequential: true, // run after vite-plugin-cesium has copied its assets
     handler() {
-      rmSync("dist/cesium/Assets/Textures/moonSmall.jpg", { force: true });
+      rmSync(`${outDir}/cesium/Assets/Textures/moonSmall.jpg`, { force: true });
       // Apache-2.0 requires the licence to travel with redistributed Cesium code
-      copyFileSync("node_modules/cesium/LICENSE.md", "dist/cesium/LICENSE.md");
+      copyFileSync("node_modules/cesium/LICENSE.md", `${outDir}/cesium/LICENSE.md`);
     },
   },
 };
@@ -51,13 +55,17 @@ const liveTiles = {
   },
 };
 
-export default defineConfig({
+// `vite build --mode mapserver` (npm run server:globe): the globe the map server serves at /globe/.
+// Relative paths, so it works wherever it's served from; no copy of public/ (the server already
+// serves /tiles and /vectors); settings from .env.mapserver, which outrank .env.local.
+export default defineConfig(({ mode }) => ({
   plugins: [cesium(), licenceHygiene, studio(), liveTiles],
+  ...(mode === "mapserver" ? { base: "./", publicDir: false, build: { outDir: "mapserver/globe", emptyOutDir: true } } : {}),
   server: {
     watch: {
       // Hundreds of thousands of tiles, and multi-GB sources: nothing there is code, and watching
       // them kept the dev server's CPU pegged (they're still served from public/, just not watched)
-      ignored: ["**/public/tiles/**", "**/data/**", "**/dist/**", "**/test-results/**", "**/playwright-report/**"],
+      ignored: ["**/public/tiles/**", "**/data/**", "**/dist/**", "**/test-results/**", "**/playwright-report/**", "**/mapserver/**"],
     },
   },
-});
+}));

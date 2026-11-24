@@ -18,6 +18,8 @@ __pycache__/
 
 # Map server metadata, generated from the layers built on this machine (npm run server:build)
 mapserver/www/
+# The globe the map server serves at /globe/ (npm run server:globe)
+mapserver/globe/
 
 # Your own settings for Vite, e.g. VITE_MAP_SERVER_URL (see .env.example)
 .env.local

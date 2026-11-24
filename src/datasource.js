@@ -3,7 +3,7 @@
 // follows the data requests themselves: a tile or file that arrives proves the server is up (green,
 // no extra request); one that fails prompts a health check straight away. A health check also runs
 // every 30 s, for when nothing is loading, and gives up after 4 s: a paused server just hangs.
-import { mapServer } from "./data.js";
+import { mapServer, servedByMapServer } from "./data.js";
 import "./datasource.css";
 
 const RECHECK_MS = 30_000;
@@ -18,17 +18,19 @@ export function mountDataSource(parent = document.body) {
   const text = badge.querySelector("span");
   parent.append(badge);
 
-  if (!mapServer) {
+  if (!mapServer && !servedByMapServer) {
     badge.dataset.state = "local";
     text.textContent = "Data: local";
     badge.title = "Map data comes straight from this site's own files (public/tiles and public/vectors).";
     return;
   }
 
-  text.textContent = "Data: map server";
+  // Served by the map server itself (/globe/), or pointed at one (VITE_MAP_SERVER_URL)
+  text.textContent = servedByMapServer ? "Data: this server" : "Data: map server";
+  const where = servedByMapServer ? `this map server (${location.origin})` : `the map server at ${mapServer}`;
   const show = (ok, how) => {
     badge.dataset.state = ok ? "online" : "offline";
-    badge.title = `Map data comes from the map server at ${mapServer}. ` +
+    badge.title = `Map data comes from ${where}. ` +
       (ok ? "It's answering" : "It isn't answering: is it running (npm run server:up) and not paused in Docker? Or check the address") +
       ` (${how}, ${new Date().toLocaleTimeString()}).`;
   };
@@ -50,7 +52,7 @@ export function mountDataSource(parent = document.body) {
     }
   });
   badge.dataset.state = "checking";
-  badge.title = `Map data comes from the map server at ${mapServer}. Checking it…`;
+  badge.title = `Map data comes from ${where}. Checking it…`;
   check();
   setInterval(check, RECHECK_MS);
 }

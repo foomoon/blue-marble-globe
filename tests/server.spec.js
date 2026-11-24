@@ -1,5 +1,5 @@
 // The map server (Docker): run it first with `npm run server:up`, then `npm run test:server`.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { expect, test } from "@playwright/test";
 
@@ -159,4 +159,20 @@ test("a globe set to use the map server (VITE_MAP_SERVER_URL) takes all its map 
   await expect(badge).toHaveAttribute("title", new RegExp(server));
   expect(fromServer.length, "map data requests to the map server").toBeGreaterThan(10);
   expect(fromSite, "map data requests to the globe's own site").toEqual([]);
+});
+
+test("the map server serves the globe at /globe/, which takes everything from the same server", async ({ page, request }) => {
+  test.skip(!existsSync("mapserver/globe/index.html"), "the server's globe isn't built (npm run server:globe)");
+  expect((await request.get(url("/globe"), { maxRedirects: 0 })).status()).toBe(301);
+  const origins = new Set();
+  page.on("request", (r) => r.url().startsWith("http") && origins.add(new URL(r.url()).origin));
+  await page.goto(url("/globe/"));
+  await page.waitForFunction(() => window.Cesium && document.querySelector(".cesium-widget canvas"), null, { timeout: 60_000 });
+  const badge = page.locator(".data-source");
+  await expect(badge).toHaveText("Data: this server");
+  await expect(badge).toHaveAttribute("data-state", "online");
+  await expect(page.locator(".cesium-widget-credits")).toContainText("NASA Earth Observatory");
+  expect([...origins], "everything from the map server itself").toEqual([new URL(BASE).origin]);
+  // And the home page links to it
+  expect(await (await request.get(url("/"))).text()).toContain("Open the globe");
 });

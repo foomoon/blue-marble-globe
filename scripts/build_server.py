@@ -293,6 +293,14 @@ def vector_thumbnail(layer_id: str, size: int = 128) -> str:
             f'<path d="{"".join(d)}" fill="none" stroke="#e6e9ee" stroke-width=".6" stroke-linejoin="round"/></svg>')
 
 
+def globe_link(base: str) -> str:
+    """A link to the globe this server serves at /globe/, once it's built (npm run server:globe)."""
+    if not (ROOT / "mapserver" / "globe" / "index.html").exists():
+        return ""
+    return (f'<p class="globe-link"><a href="{html.escape(base)}/globe/">Open the globe →</a> '
+            '<span>all these layers on a 3D globe, served from here</span></p>')
+
+
 def index_html(catalog: dict) -> str:
     rows = []
     for layer in catalog["layers"]:
@@ -327,6 +335,9 @@ def index_html(catalog: dict) -> str:
     body {{ margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
     main {{ max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }}
     h1 {{ margin: 0 0 4px; font-size: 26px; }}
+    .globe-link {{ margin: 8px 0 12px; }}
+    .globe-link a {{ display: inline-block; padding: 7px 14px; border-radius: 999px; background: var(--accent); color: var(--bg); font-weight: 600; text-decoration: none; }}
+    .globe-link span {{ margin-left: 8px; color: var(--muted); font-size: 13px; }}
     a {{ color: var(--accent); }}
     .lede, .meta {{ color: var(--muted); }}
     .meta {{ margin: 2px 0; font-size: 13px; }}
@@ -343,6 +354,7 @@ def index_html(catalog: dict) -> str:
 <body>
   <main>
     <h1>Map server</h1>
+    {globe_link(catalog["base_url"])}
     <p class="lede">{len(catalog["layers"])} layers, built {html.escape(catalog["generated_utc"])}.
       Machine-readable: <a href="{html.escape(catalog["base_url"])}/catalog.json">catalog.json</a> ·
       licensing: <a href="{html.escape(catalog["base_url"])}/licensing">LICENSING.md</a> ·
