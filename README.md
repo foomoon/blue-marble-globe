@@ -6,7 +6,7 @@
 
 Blue Marble Globe builds its own map layers from public sources and serves them from a small Docker map server: to its own CesiumJS globe, and to any other web map (Leaflet, MapLibre, OpenLayers, Cesium, QGIS). No API keys, no online map services, no licence fees, and every tile can be traced back to the exact source files it came from.
 
-**HTTPS is enforced.** Give the map server a certificate (your network's own, or one from the private CA the project sets up for you with `npm run server:cert`) and it serves everything over HTTPS only: plain HTTP does nothing but redirect to it. The admin pages sit behind a sign-in whose session cookie is marked Secure, so it is never sent unencrypted.
+**HTTPS is enforced once the server has a certificate.** Put one in its `tls/` folder (your network's own, or one from the private CA the project sets up for you with `npm run server:cert`) and the map server serves everything over HTTPS only: plain HTTP does nothing but redirect to it. Without a certificate, for example when trying it out on your own machine, it serves plain HTTP. Over HTTPS, the admin sign-in's session cookie is marked Secure, so it is never sent unencrypted.
 
 ### What it builds
 
