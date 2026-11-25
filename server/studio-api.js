@@ -9,6 +9,8 @@
 //   GET    /api/jobs/current          the running or most recent job, or null
 //   GET    /api/jobs/:id/events       Server-Sent Events: every event so far, then live
 //   POST   /api/jobs/:id/cancel       stop the build (it cleans up after itself)
+//   GET    /api/export?regions=a,b    download built regions as one region pack (a .tar), to import
+//                                     on an air-gapped map server (scripts/region_pack.py)
 //
 // Builds run scripts/build_region.py as a child process on this machine, one at a
 // time. The job lives in the dev server, not the page, so a reload just reconnects.
@@ -174,6 +176,7 @@ export function createStudioApi({ projectRoot, dir = "regions", python } = {}) {
       seconds: p.wall_clock_seconds?.total,
       tiles: p.output?.tile_count,
       bytes: p.output?.bytes,
+      total_bytes: (p.output?.bytes ?? 0) + (p.terrain?.bytes ?? 0), // imagery + terrain: a region pack's size
       scenes: p.scenes?.length,
       url: `/tiles/landsat/${name}/{z}/{x}/{y}.webp`,
     };
@@ -235,6 +238,44 @@ export function createStudioApi({ projectRoot, dir = "regions", python } = {}) {
     }
   }
 
+  // ---- /api/export ----
+  function exportApi(req, res, rest) {
+    if (!sameOrigin(req)) return send(res, 403, { error: "cross-origin request refused" });
+    if (req.method !== "GET") return send(res, 405, { error: "method not allowed" });
+    const names = [...new Set((new URL(rest, "http://x").searchParams.get("regions") ?? "").split(",").filter(Boolean))];
+    if (!names.length) return send(res, 400, { error: "name the regions: ?regions=a,b" });
+    const bad = names.find((n) => !NAME.test(n));
+    if (bad) return send(res, 400, { error: `invalid region name: ${bad}` });
+    const unbuilt = names.find((n) => !buildInfo(n));
+    if (unbuilt) return send(res, 404, { error: `${unbuilt} isn't built` });
+    if (current?.state === "running" && names.includes(current.region))
+      return send(res, 409, { error: `${current.region} is building: export it when the build is done` });
+
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
+    const shown = names.slice(0, 3).join("-") + (names.length > 3 ? `-and-${names.length - 3}-more` : "");
+    const child = spawn(python, ["-I", "scripts/region_pack.py", "export", "--stdout", ...names], {
+      cwd: projectRoot,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let err = "";
+    child.stderr.on("data", (d) => (err += d));
+    // Headers go with the first bytes: until then a failure can still be a proper error
+    child.stdout.once("data", () => {
+      res.writeHead(200, {
+        "Content-Type": "application/x-tar",
+        "Content-Disposition": `attachment; filename="regions-${shown}-${stamp}.tar"`,
+        "Cache-Control": "no-store",
+      });
+    });
+    child.stdout.pipe(res, { end: false });
+    child.on("close", (code) => {
+      if (code === 0 && res.headersSent) return res.end();
+      if (!res.headersSent) return send(res, 500, { error: err.trim().split("\n").pop() || `export failed (${code})` });
+      res.destroy(); // cut off: the importer refuses an incomplete pack
+    });
+    res.on("close", () => child.exitCode === null && child.kill()); // the download was cancelled
+  }
+
   // ---- /api/jobs ----
   function jobsApi(req, res, rest) {
     if (!sameOrigin(req)) return send(res, 403, { error: "cross-origin request refused" });
@@ -266,7 +307,7 @@ export function createStudioApi({ projectRoot, dir = "regions", python } = {}) {
   return {
     handle(req, res, next) {
       const url = req.url || "/";
-      for (const [prefix, api] of [["/api/regions", regionsApi], ["/api/jobs", jobsApi]]) {
+      for (const [prefix, api] of [["/api/regions", regionsApi], ["/api/jobs", jobsApi], ["/api/export", exportApi]]) {
         if (url === prefix || url.startsWith(prefix + "/") || url.startsWith(prefix + "?")) {
           return api(req, res, url.slice(prefix.length) || "/");
         }

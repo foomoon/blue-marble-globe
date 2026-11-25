@@ -136,3 +136,38 @@ test("tiles written after the dev server started are served (a region just built
     rmSync("public/tiles/landsat/_new-tile-probe", { recursive: true, force: true });
   }
 });
+
+test("export a built region as a region pack, and it imports into a release", async ({ page, request }, info) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Regions" }).click();
+  const box = page.locator(".studio-export");
+  await expect(box).toBeVisible();
+  await box.locator("summary").click();
+  const btn = page.locator(".studio-exportbtn");
+  await expect(btn).toHaveText("Choose regions");
+  await box.getByLabel("Mount Everest").check();
+  await expect(btn).toHaveText(/Download 1 region · ≈ [\d.]+ MB/); // imagery + terrain
+  await expect(btn).toHaveAttribute("href", "/api/export?regions=everest");
+
+  const [download] = await Promise.all([page.waitForEvent("download"), btn.click()]);
+  expect(download.suggestedFilename()).toMatch(/^regions-everest-\d{8}-\d{6}\.tar$/);
+  const pack = info.outputPath("everest.tar");
+  await download.saveAs(pack);
+  // A tar whose first file is the manifest
+  expect(readFileSync(pack).subarray(0, 100).toString()).toMatch(/region-pack\.json|PaxHeader/);
+
+  // Round trip: import it into an empty stand-in release
+  const release = info.outputPath("release");
+  for (const d of ["tiles", "www", "provenance"]) mkdirSync(`${release}/${d}`, { recursive: true });
+  const { spawnSync } = await import("node:child_process");
+  const r = spawnSync("python3", ["-I", "scripts/region_pack.py", "import", pack, "--release", release], { encoding: "utf8" });
+  expect(r.stderr).toBe("");
+  expect(r.stdout).toContain("added: everest");
+  const index = JSON.parse(readFileSync(`${release}/tiles/landsat/index.json`, "utf8"));
+  expect(index.regions.map((x) => x.name)).toEqual(["everest"]);
+  expect(existsSync(`${release}/www/tilejson/landsat/everest.json`)).toBe(true);
+
+  // Only built regions, only good names
+  expect((await request.get("/api/export?regions=not-built-here")).status()).toBe(404);
+  expect((await request.get("/api/export?regions=../etc")).status()).toBe(400);
+});

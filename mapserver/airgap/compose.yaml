@@ -1,6 +1,10 @@
-# Blue Marble Globe map server, serve-only (no admin page, no builds), as installed from a bundle
-# on a network without internet. install.sh puts this file in the install folder and fills in
-# the image version. Settings go in .env next to it (install.sh keeps it): HTTP_PORT, HTTPS_PORT.
+# Blue Marble Globe map server, as installed from a bundle on a network without internet. Serves
+# the maps; its admin page (/admin/, behind a sign-in) only imports region packs exported on the
+# connected side: nothing is built here. install.sh puts this file in the install folder and fills
+# in the image version. Settings go in .env next to it (install.sh keeps it):
+#   HTTP_PORT, HTTPS_PORT   the ports (80, 443)
+#   ADMIN                   import (default): the Import page; off: serve-only, no admin page at all
+#   HOST_UID, HOST_GID      who the importer runs as: the owner of the install folder
 name: blue-marble-globe
 services:
   mapserver:
@@ -9,7 +13,7 @@ services:
       - "${HTTP_PORT:-80}:8080"
       - "${HTTPS_PORT:-443}:8443"
     environment:
-      MAPSERVER_ADMIN: "off"
+      MAPSERVER_ADMIN: ${ADMIN:-import}
       MAPSERVER_HTTPS_PORT: ${HTTPS_PORT:-443}
     volumes:
       - ./current/www:/srv/www:ro
@@ -17,7 +21,22 @@ services:
       - ./current/tiles:/srv/tiles:ro
       - ./current/vectors:/srv/vectors:ro
       - ./current/provenance:/srv/provenance:ro
+      - ./current/import:/srv/admin:ro   # the admin page here is the Import page
+      - ./current/login:/srv/login:ro
       - ./current/LICENSING.md:/srv/docs/LICENSING.md:ro
       - ./current/NOTICE:/srv/docs/NOTICE:ro
       - ./tls:/etc/nginx/tls:ro     # server.crt + server.key: HTTPS (see README.txt)
+    restart: unless-stopped
+
+  # The sign-in and the Import (region packs): Python's standard library, no ports of its own
+  # (nginx passes /auth/ and /api/ to it). It writes only into the running release: new region
+  # folders, the regions list and the catalog.
+  importer:
+    image: blue-marble-globe/importer:__VERSION__
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    init: true
+    volumes:
+      - ./current:/release
+      - ./auth:/auth                # users + session-secret: set-password.sh
+    mem_limit: 1g
     restart: unless-stopped

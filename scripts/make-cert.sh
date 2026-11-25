@@ -22,6 +22,7 @@ mkdir -p "$CA" "$TLS"; chmod 700 "$CA"
 # Subject alternative names: every argument, plus localhost for checks on the server itself
 san="DNS:localhost,IP:127.0.0.1"
 for n in "$@"; do
+  [[ "$n" == localhost || "$n" == 127.0.0.1 ]] && continue   # in already
   if [[ "$n" =~ ^[0-9]+(\.[0-9]+){3}$ || "$n" == *:* ]]; then san="$san,IP:$n"
   elif [[ "$n" =~ ^[A-Za-z0-9*]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then san="$san,DNS:$n"
   else echo "Not a host name or IP address: $n" >&2; exit 1; fi

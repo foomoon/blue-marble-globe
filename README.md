@@ -6,6 +6,8 @@
 
 Blue Marble Globe builds its own map layers from public sources and serves them from a small Docker map server: to its own CesiumJS globe, and to any other web map (Leaflet, MapLibre, OpenLayers, Cesium, QGIS). No API keys, no online map services, no licence fees, and every tile can be traced back to the exact source files it came from.
 
+**HTTPS is enforced.** Give the map server a certificate (your network's own, or one from the private CA the project sets up for you with `npm run server:cert`) and it serves everything over HTTPS only: plain HTTP does nothing but redirect to it. The admin pages sit behind a sign-in whose session cookie is marked Secure, so it is never sent unencrypted.
+
 ### What it builds
 
 | Layer | Source | Detail | Size |
@@ -24,7 +26,7 @@ The globe is **medium resolution everywhere and sharp only where you need it**. 
 | --- | --- |
 | Map data: base maps, terrain, vectors and regions | ~1.1 GB |
 | The globe app | 13 MB |
-| The map server container (nginx) | 26 MB |
+| The map server containers (nginx, and the air-gapped importer) | 42 MB |
 | **Everything, as one offline bundle** | **~1.4 GB** |
 
 The builder container that makes the layers (GDAL, Python, Node: 816 MB) stays on the machine that builds them; the map server doesn't need it.
@@ -40,12 +42,14 @@ flowchart LR
     S --> B["npm run bundle<br/>one folder, ~1.4 GB"]
   end
   subgraph Gapped["Air-gapped network"]
-    I["./install.sh<br/>checks every file's checksum"] --> M["Map server, serve-only<br/>globe and layers over HTTPS"]
+    I["./install.sh<br/>checks every file's checksum"] --> M["Map server<br/>globe and layers over HTTPS"]
+    R["Import regions<br/>admin page or add-regions.sh"] --> M
   end
   B -- "carried across" --> I
+  S -- "Export: region pack, a few MB" --> R
 ```
 
-Updates travel the same way. The air-gapped server serves the globe and every layer fully offline, over HTTPS with your network's own certificate or one the project makes for you.
+Full updates travel the same way. A new region doesn't need a whole new bundle: export it from the admin page as a **region pack** (a few MB), carry that across, and import it on the air-gapped server's own admin page, or with `./add-regions.sh`. Every file is checked before anything changes. The air-gapped server serves the globe and every layer fully offline, HTTPS only, with your network's own certificate or one the project makes for you.
 
 ### Free to use
 
@@ -284,9 +288,10 @@ scripts/dedupe_tiles.py     stores identical tiles once (hard links, at most 60,
 scripts/admin-password.sh   sets the admin login (npm run server:password)
 scripts/make-cert.sh        HTTPS certificate from a private CA (npm run server:cert)
 scripts/bundle.sh           offline bundle for air-gapped networks (npm run bundle)
+scripts/region_pack.py      region packs: export regions, import them on an air-gapped server
 scripts/setup-ubuntu.sh     building outside Docker: installs everything on Ubuntu 24.04
 scripts/doctor.py           building outside Docker: checks every dependency (npm run doctor)
-mapserver/                  map server containers: nginx config, builder, sign-in page, offline bundle files
+mapserver/                  map server containers: nginx config, builder, importer, sign-in and Import pages, offline bundle files
 compose.yaml                runs the map server and builder (npm run server:up)
 scripts/screenshots.mjs     regenerates the README screenshots in docs/images/ (npm run screenshots [-- --regions])
 LICENSING.md                terms, quotes and conditions, with links
@@ -341,7 +346,7 @@ npm run server:up         # builds the globe, the admin page and both images, th
 - **Finished regions appear straight away** on the globe, the admin page, the home page and the catalog.
 - **Images:** builder about 820 MB, map server about 90 MB. A machine that only serves maps can run just the map server.
 
-**HTTPS and air-gapped networks.** Put a certificate in `mapserver/tls/` and the server switches to HTTPS (`npm run server:cert` makes one from a private CA, for networks without their own). For a network without internet, `npm run bundle` packs the server and all the map data into one folder; its `install.sh` installs or updates a **serve-only** server (no admin page) with nothing but Docker, after checking every file's checksum. See [docs/map-server.md](docs/map-server.md), sections 6 and 7.
+**HTTPS and air-gapped networks.** Put a certificate in `mapserver/tls/` and the server switches to HTTPS (`npm run server:cert` makes one from a private CA, for networks without their own). For a network without internet, `npm run bundle` packs the server and all the map data into one folder; its `install.sh` installs or updates the server with nothing but Docker, after checking every file's checksum. Regions built later travel as **region packs** (Regions panel → Export, or `npm run regions:export -- <names>`), imported on the air-gapped server's admin page or with `./add-regions.sh`. See [docs/map-server.md](docs/map-server.md), sections 6 and 7.
 
 **A separately run globe can use the server too.** By default the globe loads map data from its own site. Start or build it with the server's address, and it takes all of it (tiles, terrain, regions, lines) from the map server instead:
 

@@ -92,7 +92,7 @@
   <div class="earth" aria-hidden="true"></div>
   <main>
     <h1>Blue Marble Globe <span class="badge">admin</span></h1>
-    <p class="sub">Sign in to add and build regions.</p>
+    <p class="sub">Sign in to manage this server's regions.</p>
     <form>
       <label>Username <input name="username" autocomplete="username" required autofocus></label>
       <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
@@ -127,7 +127,7 @@
         const body = await res.json().catch(() => ({}));
         message.textContent =
           res.status === 429 ? "Too many attempts. Wait a minute and try again."
-          : res.status === 502 || res.status === 504 ? "The map server's builder isn't running, so sign-in is unavailable."
+          : res.status === 502 || res.status === 504 ? "The map server's admin service (builder or importer) isn't running, so sign-in is unavailable."
           : body.error || "Couldn't sign in.";
         form.password.select();
       } catch {

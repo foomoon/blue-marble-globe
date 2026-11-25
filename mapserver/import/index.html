@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Import regions · Blue Marble Globe</title>
+  <style>
+    /* The admin page of an air-gapped map server (served at /admin/, behind the sign-in). The
+       app's own look, as the sign-in page (mapserver/login/). */
+    :root {
+      --bg: rgba(12, 18, 28, 0.88);
+      --fg: #e6e9ee;
+      --muted: #9aa4b2;
+      --line: rgba(255, 255, 255, 0.1);
+      --accent: #7cb7ff;
+      --ok: #7fe0a0;
+      --error: #ff8a7c;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    body {
+      display: grid;
+      place-items: start center;
+      padding: 8vh 16px 32px;
+      background: #05080d;
+      color: var(--fg);
+      font: 14px/1.5 var(--font);
+    }
+    .earth {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 50% 55%, transparent 0 30%, #05080d 62%),
+                  url("/tiles/blue-marble-webp/0/0/0.webp") center 55% / min(110vmin, 900px) no-repeat;
+      filter: blur(2px) saturate(0.9);
+      opacity: 0.45;
+    }
+    main {
+      position: relative;
+      width: min(560px, 100%);
+      padding: 24px 24px 20px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--bg);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    header { display: flex; align-items: center; gap: 8px; }
+    h1 { margin: 0; font-size: 18px; font-weight: 650; }
+    .badge {
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: rgba(255, 210, 124, 0.15);
+      color: #ffd27c;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .signout {
+      margin-left: auto;
+      padding: 3px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: none;
+      color: var(--muted);
+      font: 12px var(--font);
+      cursor: pointer;
+    }
+    .signout:hover { color: var(--fg); border-color: var(--muted); }
+    .sub { margin: 4px 0 18px; color: var(--muted); font-size: 13px; }
+    h2 { margin: 20px 0 6px; font-size: 13px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .drop {
+      display: grid;
+      place-items: center;
+      gap: 6px;
+      padding: 26px 16px;
+      border: 1.5px dashed rgba(124, 183, 255, 0.45);
+      border-radius: 10px;
+      background: rgba(124, 183, 255, 0.06);
+      text-align: center;
+      cursor: pointer;
+    }
+    .drop:hover, .drop.over { background: rgba(124, 183, 255, 0.14); border-color: var(--accent); }
+    .drop strong { font-size: 14px; }
+    .drop span { color: var(--muted); font-size: 12.5px; }
+    .drop input { display: none; }
+    .drop.busy { cursor: wait; opacity: 0.7; }
+    progress { width: 100%; height: 6px; margin-top: 10px; accent-color: var(--accent); }
+    .message { min-height: 20px; margin: 10px 0 0; font-size: 13px; }
+    .message.ok { color: var(--ok); }
+    .message.error { color: var(--error); }
+    ul { margin: 0; padding: 0; list-style: none; }
+    li { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); }
+    li strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    li span { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    li.new strong::after { content: "new"; margin-left: 8px; padding: 0 6px; border-radius: 999px; background: rgba(127, 224, 160, 0.15); color: var(--ok); font-size: 11px; font-weight: 600; }
+    .empty { color: var(--muted); }
+    .how { margin: 18px 0 0; color: var(--muted); font-size: 12.5px; }
+    code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); white-space: nowrap; }
+    .back { display: inline-block; margin-top: 14px; color: var(--muted); font-size: 12.5px; text-decoration: none; }
+    .back:hover { color: var(--fg); }
+  </style>
+</head>
+<body>
+  <div class="earth" aria-hidden="true"></div>
+  <main>
+    <header>
+      <h1>Import regions</h1><span class="badge">admin</span>
+      <button class="signout" type="button">Sign out</button>
+    </header>
+    <p class="sub">Add high-resolution regions exported from the connected side. Each one goes in beside the
+      others (or replaces its own older build); nothing else changes, and the server keeps running.</p>
+
+    <label class="drop">
+      <input type="file" accept=".tar,application/x-tar">
+      <strong>Drop a region pack here, or choose one</strong>
+      <span>regions-….tar: from the admin page's Regions panel (Export) on the connected side</span>
+    </label>
+    <progress hidden max="1" value="0"></progress>
+    <p class="message" role="status"></p>
+
+    <h2>On this server</h2>
+    <ul class="regions"><li class="empty">Loading…</li></ul>
+
+    <p class="how">Large packs, or no browser at hand: copy the file to the server and run
+      <code>./add-regions.sh regions-….tar</code> in the install folder.</p>
+    <a class="back" href="/globe/">← Back to the globe</a>
+  </main>
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const drop = $(".drop"), input = drop.querySelector("input"), bar = $("progress"), message = $(".message");
+    const mb = (b) => (b / 1e6).toLocaleString(undefined, { maximumFractionDigits: 1 }) + " MB";
+    let busy = false;
+
+    function say(text, kind = "") {
+      message.textContent = text;
+      message.className = "message " + kind;
+    }
+
+    async function loadRegions(fresh = []) {
+      const list = $(".regions");
+      let regions = [];
+      try {
+        const res = await fetch("/tiles/landsat/index.json?t=" + Date.now());
+        if (res.ok) regions = (await res.json()).regions || [];
+      } catch {}
+      list.replaceChildren();
+      if (!regions.length) {
+        list.innerHTML = '<li class="empty">None yet: only the global layers</li>';
+        return;
+      }
+      for (const r of regions) {
+        const li = document.createElement("li");
+        if (fresh.includes(r.name)) li.className = "new";
+        const name = document.createElement("strong");
+        name.textContent = r.title || r.name;
+        const info = document.createElement("span");
+        info.textContent = `${r.name} · ${Number(r.tile_count || 0).toLocaleString()} tiles` +
+          (r.terrain ? " · terrain" : "") + ` · built ${String(r.built_utc || "").slice(0, 10)}`;
+        li.append(name, info);
+        list.append(li);
+      }
+    }
+
+    function upload(file) {
+      if (busy || !file) return;
+      if (!/\.tar$/i.test(file.name)) return say("That isn't a region pack: expected a .tar file (regions-….tar).", "error");
+      busy = true;
+      drop.classList.add("busy");
+      bar.hidden = false;
+      bar.value = 0;
+      say(`Uploading ${file.name} (${mb(file.size)})…`);
+      // XMLHttpRequest, not fetch: it reports upload progress
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/import");
+      xhr.setRequestHeader("Content-Type", "application/x-tar");
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        bar.value = e.loaded / e.total;
+        if (e.loaded === e.total) say(`Checking every file in ${file.name}…`);
+      };
+      xhr.onload = () => {
+        let body = {};
+        try { body = JSON.parse(xhr.responseText); } catch {}
+        if (xhr.status === 401) return location.replace("/login/?next=/admin/");
+        if (xhr.status === 200) {
+          const parts = [];
+          if (body.added?.length) parts.push(`Added ${body.added.join(", ")}`);
+          if (body.replaced?.length) parts.push(`replaced ${body.replaced.join(", ")} with the new build`);
+          say(`${parts.join("; ")}. ${Number(body.files).toLocaleString()} files, checked. They're on the globe now.`, "ok");
+          loadRegions([...(body.added || []), ...(body.replaced || [])]);
+        } else if (xhr.status === 413) {
+          say(body.error || "Too large to upload here: copy it to the server and run ./add-regions.sh.", "error");
+        } else if (xhr.status === 502 || xhr.status === 504) {
+          say("The importer isn't running (docker compose ps, in the install folder).", "error");
+        } else {
+          say(body.error || `Import failed (HTTP ${xhr.status}).`, "error");
+        }
+      };
+      xhr.onerror = () => say("The upload didn't get through: check the connection and try again.", "error");
+      xhr.onloadend = () => {
+        busy = false;
+        drop.classList.remove("busy");
+        bar.hidden = true;
+        input.value = "";
+      };
+      xhr.send(file);
+    }
+
+    input.addEventListener("change", () => upload(input.files[0]));
+    for (const ev of ["dragenter", "dragover"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); });
+    for (const ev of ["dragleave", "drop"]) drop.addEventListener(ev, () => drop.classList.remove("over"));
+    drop.addEventListener("drop", (e) => { e.preventDefault(); upload(e.dataTransfer.files[0]); });
+    $(".signout").addEventListener("click", async () => {
+      await fetch("/auth/logout", { method: "POST" }).catch(() => {});
+      location.replace("/globe/");
+    });
+    loadRegions();
+  </script>
+</body>
+</html>

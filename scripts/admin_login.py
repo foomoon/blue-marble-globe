@@ -10,7 +10,8 @@ Replaces any other users (one admin login). Standard library only.
 import base64, hashlib, os, re, secrets, sys
 from pathlib import Path
 
-AUTH = Path(__file__).resolve().parents[1] / "mapserver" / "auth"
+# mapserver/auth/, or MAPSERVER_AUTH_DIR (the importer container on an air-gapped server: set-password.sh)
+AUTH = Path(os.environ.get("MAPSERVER_AUTH_DIR") or Path(__file__).resolve().parents[1] / "mapserver" / "auth")
 N, R, P = 2**15, 8, 1  # scrypt cost: ~32 MB and a fraction of a second per check
 
 user = sys.argv[1] if len(sys.argv) == 2 else ""
@@ -28,6 +29,6 @@ AUTH.mkdir(parents=True, exist_ok=True)
 for name, text in [("users", line), ("session-secret", secrets.token_hex(32) + "\n")]:
     tmp = AUTH / (name + ".tmp")
     tmp.write_text(text)
-    os.chmod(tmp, 0o600)  # yours only: the builder, which checks sign-ins, runs as you
+    os.chmod(tmp, 0o600)  # yours only: the builder (or importer), which checks sign-ins, runs as you
     os.replace(tmp, AUTH / name)
 (AUTH / "htpasswd").unlink(missing_ok=True)  # the old basic-auth file, if any

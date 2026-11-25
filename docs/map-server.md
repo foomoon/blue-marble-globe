@@ -226,7 +226,7 @@ Where the certificate comes from:
 
 ## 7. Air-gapped networks: offline bundles
 
-Build and update on a network with internet, then carry the result to the air-gapped one, where it runs **serve-only**: the globe and the layers, with no admin page, builder or sign-in (region builds need the internet). The globe makes no requests anywhere but the map server, so it works fully offline.
+Build and update on a network with internet, then carry the result to the air-gapped one. There it serves the globe and the layers, with no builder (builds need the internet); its admin page only **imports regions** built on the connected side (below). The globe makes no requests anywhere but the map server, so it works fully offline.
 
 On the connected side:
 
@@ -235,7 +235,7 @@ npm run maps        # the map data (and regions, from the admin page, as usual)
 npm run bundle      # bundles/blue-marble-globe-<date>/, for linux/amd64 (--platform linux/arm64 for ARM)
 ```
 
-The bundle (about 1.3 GB today) holds the map server image (25 MB), the map data, `install.sh`, `README.txt`, `ca.crt` if you made a private CA, and `SHA256SUMS`. Never the admin login, the HTTPS key or the CA's key.
+The bundle (about 1.4 GB today) holds the images (42 MB: the map server, and the importer, Python's standard library on Alpine), the map data, `install.sh`, `add-regions.sh`, `set-password.sh`, `README.txt`, `ca.crt` if you made a private CA, and `SHA256SUMS`. Never the admin login, the HTTPS key or the CA's key.
 
 On the air-gapped server (Linux with Docker and its compose plugin; nothing else, and no internet):
 
@@ -243,9 +243,23 @@ On the air-gapped server (Linux with Docker and its compose plugin; nothing else
 ./install.sh                     # into /opt/blue-marble-globe (or give another folder)
 ```
 
-It checks every file against `SHA256SUMS` (a damaged copy is refused before anything changes), loads the image, unpacks the data as a new release, switches to it and restarts. The previous release is kept, for going back. **Updates** are the same: a new bundle, carried across, `./install.sh`. For HTTPS, put `server.crt` and `server.key` in `/opt/blue-marble-globe/tls/` once and run `install.sh` again; ports are in `.env` there (80 and 443). The bundle's `README.txt` has the details, including trusting the CA on each device.
+It checks every file against `SHA256SUMS` (a damaged copy is refused before anything changes), loads the images, unpacks the data as a new release, switches to it and restarts. The previous release is kept, for going back. **Updates** are the same: a new bundle, carried across, `./install.sh`; regions imported on the server that the new bundle doesn't have are kept. Run it as the user who should own the install folder, not root. For HTTPS, put `server.crt` and `server.key` in `/opt/blue-marble-globe/tls/` once and run `install.sh` again; ports are in `.env` there (80 and 443). The bundle's `README.txt` has the details, including trusting the CA on each device.
 
-Tested in a simulated air-gapped x86-64 Linux server (Docker inside Docker, networking off): install, HTTPS by name and IP, an update, and a damaged bundle being refused.
+### Adding regions later: region packs
+
+A new region doesn't need a new 1.4 GB bundle. A region is self-contained (its own folder of imagery and terrain tiles, and its build record), so it travels on its own, as a **region pack**: one `.tar` of a few MB per region.
+
+1. **Export** on the connected side: the admin page's Regions panel, **Export for another server** (tick built regions, download), or `npm run regions:export -- kauai,maui` (into `bundles/`).
+2. **Carry it across.**
+3. **Import** on the air-gapped server, either way:
+   - **its admin page**, `/admin/` (the globe's **Admin** pill): sign in, drop the file on the page. Set that server's own sign-in once first: `./set-password.sh` in the install folder.
+   - **`./add-regions.sh regions-….tar`** in the install folder: for large packs, or no browser at hand.
+
+A pack starts with a manifest listing every file's SHA-256. Importing checks it all in a staging folder first: only region tiles and records, no links or odd paths, every checksum. A damaged or altered pack is refused, with nothing changed. Then each region goes in beside the others (or replaces its own older build), and the regions list and catalog are rewritten from what's actually on that server, so regions it already had stay listed. The server keeps running; the globe shows the new regions on the next page load.
+
+The air-gapped admin page is the **importer** container (`mapserver/importer/`): the same sign-in rules as the connected side (scrypt hashes, a signed 12-hour cookie, slowed guessing, same-origin requests only), no ports of its own, and it can write only into the running release. `ADMIN=off` in `.env` leaves out the admin page and sign-in altogether (serve-only).
+
+Tested in a simulated air-gapped x86-64 Linux server (Docker inside Docker, networking off), as a non-root user: install, HTTPS by name and IP, an update from a serve-only bundle, importing on the admin page and with `add-regions.sh`, an imported region kept through a full update, and damaged bundles and packs (altered tile, missing file, path escape, link, cut-off upload) being refused.
 
 ## 8. Attribution travels with the layers
 
@@ -255,15 +269,17 @@ Every layer's TileJSON and catalog entry carries its attribution, and MapLibre, 
 
 | File | Role |
 | --- | --- |
-| `scripts/build_server.py` | Reads the provenance records and writes the catalog, TileJSON and index page to `mapserver/www/` |
+| `scripts/build_server.py` | Reads the provenance records and writes the catalog, TileJSON and index page to `mapserver/www/` (or an installed release's `www/`) |
+| `scripts/region_pack.py` | Region packs: export (`npm run regions:export`, the admin page), import and checks (`add-regions.sh`, the importer) |
 | `mapserver/site.conf` | The URL routes, `204` for skipped tiles, caching, gzip |
-| `mapserver/admin.conf` | The admin page, sign-in and API routes, all handled by the builder |
+| `mapserver/admin.conf` | The admin page, sign-in and API routes, handled by the builder (or, air-gapped, the importer) |
 | `mapserver/http.conf` | Settings outside the server: the address scheme, the sign-in rate limit |
-| `mapserver/mapserver-config.sh` | At start-up, puts these together: HTTPS if there's a certificate, admin routes unless `MAPSERVER_ADMIN=off` |
+| `mapserver/mapserver-config.sh` | At start-up, puts these together: HTTPS if there's a certificate; admin routes for the builder (`MAPSERVER_ADMIN=on`), the importer (`import`) or none (`off`) |
 | `mapserver/builder/Dockerfile` | The builder: GDAL, Python, numpy and Node, for map and region builds |
 | `server/admin-api.js`, `auth.js`, `studio-api.js` | The builder's API: sign-in and sessions, regions and build jobs |
 | `mapserver/login/` | The sign-in page |
-| `mapserver/airgap/` | What an offline bundle carries: its compose file, `install.sh`, `README.txt` |
+| `mapserver/importer/`, `mapserver/import/` | The air-gapped admin page: the importer (sign-in, `/api/import`) and its Import page |
+| `mapserver/airgap/` | What an offline bundle carries: its compose file, `install.sh`, `add-regions.sh`, `set-password.sh`, `README.txt` |
 | `scripts/bundle.sh`, `make-cert.sh` | `npm run bundle`, `npm run server:cert` |
 | `mapserver/cors.conf`, `origin.conf` | Cross-origin headers; filling in the server's own address |
 | `mapserver/Dockerfile` | `nginx` on Alpine, with a health check at `/healthz` |

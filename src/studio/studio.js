@@ -157,6 +157,13 @@ export function mountStudio(viewer, layers) {
       </form>
       <h3>Saved</h3>
       <ul class="studio-list"></ul>
+      <details class="studio-export" hidden>
+        <summary>Export for another server</summary>
+        <p class="studio-hint">Built regions as one file (a region pack), for a map server that doesn't have them:
+          on an air-gapped server, its admin page's Import, or <code>./add-regions.sh</code>.</p>
+        <ul class="studio-exportlist"></ul>
+        <a class="studio-exportbtn" download aria-disabled="true">Choose regions</a>
+      </details>
     </div>`;
   document.body.append(toggle, panel);
 
@@ -462,6 +469,45 @@ export function mountStudio(viewer, layers) {
         await loadSaved();
       });
       list.append(li);
+    }
+    renderExport(building);
+  }
+
+  // ---- Export: built regions as a region pack (GET /api/export, a download) ----
+  function renderExport(building) {
+    const built = saved.filter((r) => r.build);
+    const box = $(".studio-export");
+    box.hidden = !built.length;
+    const list = $(".studio-exportlist");
+    const ticked = new Set([...list.querySelectorAll("input:checked")].map((i) => i.value));
+    list.replaceChildren();
+    for (const r of built) {
+      const li = el("li", "studio-exportitem");
+      const label = document.createElement("label");
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.value = r.name;
+      box.checked = ticked.has(r.name);
+      box.disabled = r.name === building;
+      box.addEventListener("change", updateExport);
+      label.append(box, el("span", "", r.title), el("small", "", fmtBytes(r.build.total_bytes ?? r.build.bytes)));
+      li.append(label);
+      list.append(li);
+    }
+    updateExport();
+  }
+  function updateExport() {
+    const picked = [...$(".studio-exportlist").querySelectorAll("input:checked")].map((i) => i.value);
+    const btn = $(".studio-exportbtn");
+    const bytes = saved.filter((r) => picked.includes(r.name)).reduce((n, r) => n + (r.build?.total_bytes ?? r.build?.bytes ?? 0), 0);
+    if (picked.length) {
+      btn.href = `/api/export?regions=${picked.map(encodeURIComponent).join(",")}`;
+      btn.removeAttribute("aria-disabled");
+      btn.textContent = `Download ${picked.length === 1 ? "1 region" : `${picked.length} regions`} · ≈ ${fmtBytes(bytes)}`;
+    } else {
+      btn.removeAttribute("href");
+      btn.setAttribute("aria-disabled", "true");
+      btn.textContent = "Choose regions";
     }
   }
 

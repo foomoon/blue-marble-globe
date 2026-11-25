@@ -1,4 +1,9 @@
+import { existsSync } from "node:fs";
 import { defineConfig } from "@playwright/test";
+
+// The map server's address for npm run test:server: HTTPS when it has a certificate
+// (mapserver/tls/: then plain HTTP only redirects), else HTTP. Workers inherit it.
+process.env.MAPSERVER_URL ??= existsSync("mapserver/tls/server.crt") ? "https://localhost:8443" : "http://localhost:8080";
 
 // Two targets:
 //   prod: the production build (`vite build` + `vite preview`), which is what gets
@@ -19,7 +24,9 @@ export default defineConfig({
   projects: [
     { name: "prod", testMatch: "globe.spec.js", use: { baseURL: "http://localhost:4173" } },
     { name: "dev", testMatch: /(studio|build)\.spec\.js/, use: { baseURL: "http://localhost:5174" } },
-    { name: "server", testMatch: "server.spec.js" }, // the Docker map server (npm run test:server)
+    // The Docker map server (npm run test:server). Its certificate is from the project's own CA,
+    // which the test browser doesn't know: a test checks it against mapserver/tls/ca.crt instead.
+    { name: "server", testMatch: "server.spec.js", use: { ignoreHTTPSErrors: true } },
   ],
   webServer: [
     {
@@ -40,7 +47,7 @@ export default defineConfig({
       ? [{
           command: "npx vite --port 5175 --strictPort",
           url: "http://localhost:5175",
-          env: { VITE_MAP_SERVER_URL: process.env.MAPSERVER_URL ?? "http://localhost:8080" },
+          env: { VITE_MAP_SERVER_URL: process.env.MAPSERVER_URL },
           reuseExistingServer: false,
         }]
       : []),

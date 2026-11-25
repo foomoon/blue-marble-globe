@@ -1,9 +1,10 @@
 // The map server (Docker): run it first with `npm run server:up`, then `npm run test:server`.
 import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
+import https from "node:https";
 import { expect, test } from "@playwright/test";
 
-const BASE = process.env.MAPSERVER_URL ?? "http://localhost:8080";
+const BASE = process.env.MAPSERVER_URL ?? "http://localhost:8080"; // playwright.config.js picks it
 test.skip(!process.env.SERVER_TEST, "start the server (npm run server:up), then npm run test:server");
 
 const url = (path) => (path.startsWith("http") ? path : BASE + path);
@@ -37,7 +38,7 @@ test("catalog lists every layer, each tiled layer has valid TileJSON", async ({ 
 
   // The same server reached by another name puts that name in its URLs
   const other = await request.get(url("/catalog.json"), { headers: { Host: "maps.lan:8080" } });
-  expect((await other.json()).layers[0].provenance).toMatch(/^http:\/\/maps\.lan:8080\//);
+  expect((await other.json()).layers[0].provenance).toMatch(new RegExp(`^${new URL(BASE).protocol}//maps\\.lan:8080/`));
 
   for (const layer of layers.filter((l) => l.kind === "raster" || l.kind === "terrain")) {
     const tj = await request.get(url(layer.tilejson));
@@ -180,7 +181,8 @@ test("the map server serves the globe at /globe/, which takes everything from th
 test("the admin page and its API need a signed-in session", async ({ request }) => {
   const admin = await request.get(url("/admin/"), { maxRedirects: 0 });
   expect(admin.status()).toBe(302);
-  expect(admin.headers().location).toBe(`${new URL(BASE).origin}/login/?next=/admin/`);
+  // Relative: the browser keeps the address and port it used (behind port 80, nginx's own 8080 is wrong)
+  expect(admin.headers().location).toBe("/login/?next=/admin/");
   expect((await request.get(url("/api/regions"))).status()).toBe(401);
   expect((await request.get(url("/login/"))).status()).toBe(200);
   // A made-up session cookie doesn't get in
@@ -268,4 +270,17 @@ test("the server light turns red when the server stops answering, and green agai
   await zoomIn();
   await expect(light).toHaveText("Server", { timeout: 15000 });
   await expect(light).toHaveAttribute("data-state", "online");
+});
+
+// HTTPS, when the server has a certificate (npm run server:cert): checked properly here, against
+// the project's CA, where the browser tests above just accept it
+test("HTTPS: a certificate the project's CA vouches for, and HTTP redirects to it", async ({ request }) => {
+  test.skip(!BASE.startsWith("https:"), "no certificate in mapserver/tls/ (npm run server:cert)");
+  const status = await new Promise((resolve, reject) =>
+    https.get(`${BASE}/healthz`, { ca: readFileSync("mapserver/tls/ca.crt") }, (res) => resolve(res.statusCode)).on("error", reject));
+  expect(status).toBe(200); // the connection fails if the certificate isn't valid for this name
+  const plain = await request.get("http://localhost:8080/globe/", { maxRedirects: 0 });
+  expect(plain.status()).toBe(301);
+  expect(plain.headers().location).toBe(`${BASE}/globe/`);
+  expect((await request.get("http://localhost:8080/healthz", { maxRedirects: 0 })).status()).toBe(200);
 });

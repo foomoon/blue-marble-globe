@@ -17,6 +17,7 @@
     "server:up": "mkdir -p mapserver/auth mapserver/tls && python3 -I scripts/build_server.py && npm run -s server:globe && npm run -s server:admin && HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose up -d --build",
     "server:down": "docker compose down",
     "bundle": "bash scripts/bundle.sh",
+    "regions:export": "python3 -I scripts/region_pack.py export",
     "maps": "mkdir -p data public/tiles public/vectors provenance mapserver/www mapserver/globe mapserver/auth && HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose run --rm --build builder python3 -I scripts/build_maps.py",
     "fetch:source": "python3 -I scripts/fetch_source.py",
     "fetch:terms": "python3 -I scripts/fetch_terms.py",

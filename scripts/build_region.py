@@ -48,6 +48,7 @@ from pathlib import Path
 import numpy as np
 from osgeo import gdal, ogr, osr
 
+import build_server  # the regions list (shared with the map server's import)
 import region_terrain
 
 gdal.UseExceptions()
@@ -456,33 +457,11 @@ def digest(root):
 def write_regions_index():
     """public/tiles/landsat/index.json: every built region, for the globe's Layers control."""
     base = ROOT / "public" / "tiles" / "landsat"
-    regions = []
-    for prov in sorted(base.glob("*/PROVENANCE.json")) if base.exists() else []:
-        rec = json.loads(prov.read_text())
-        cfg, name = rec["region"], prov.parent.name
-        regions.append({
-            "name": name,
-            "title": cfg.get("title", name),
-            "bbox": cfg["bbox"],
-            **({"boundary": cfg["boundary"]} if cfg.get("boundary") else {}),
-            "zoom": cfg["zoom"],
-            "url": f"/tiles/landsat/{name}/{{z}}/{{x}}/{{y}}.webp",
-            **({"tiles_index": f"/tiles/landsat/{name}/tiles.json"} if (prov.parent / "tiles.json").exists() else {}),
-            "credit": rec["data"]["credit"],
-            "built_utc": rec["built_utc"],
-            "tile_count": rec["output"]["tile_count"],
-            **({"terrain": {
-                "url": f"/tiles/landsat/{name}/terrain/{{z}}/{{x}}/{{y}}.webp",
-                "tiles_index": f"/tiles/landsat/{name}/terrain/tiles.json",
-                "zoom": rec["terrain"]["zoom"],
-                "source": rec["terrain"]["label"],
-                "detail_m": rec["terrain"]["detail_m"],
-                "credit": rec["terrain"]["credit"],
-            }} if rec.get("terrain") and (prov.parent / "terrain" / "tiles.json").exists() else {}),
-        })
+    index = build_server.regions_index()
+    regions = index["regions"]
     if regions or (base / "index.json").exists():
         base.mkdir(parents=True, exist_ok=True)
-        (base / "index.json").write_text(json.dumps({"regions": regions}, indent=2) + "\n")
+        build_server.write_atomic(base / "index.json", json.dumps(index, indent=2) + "\n")
         # The map server's home page and catalog list regions too: refresh them (if it's set up)
         try:
             r = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_server.py"), "--refresh"],

@@ -12,6 +12,11 @@ Writes mapserver/www/ (gitignored; regenerate after building or rebuilding a lay
   index.html                  a human-readable index with previews and copy-paste snippets
 
   python3 scripts/build_server.py [--base-url https://maps.example.com]
+  python3 scripts/build_server.py --release DIR    an installed release instead (see below)
+
+With --release, it works on an installed release of the map server (an air-gapped install:
+mapserver/airgap/), whose folders are www/, tiles/, vectors/, provenance/ and globe/: after
+regions are imported there (import_regions.py), it rewrites tiles/landsat/index.json and www/.
 
 Every URL in these files must be absolute: a web map on another site would resolve /tiles/...
 against itself. Without --base-url, they start with a placeholder that nginx swaps for the address
@@ -30,8 +35,20 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Where things are. In this project by default; use_release() points them at an installed release.
 TILES = ROOT / "public" / "tiles"
 WWW = ROOT / "mapserver" / "www"
+VECTORS = ROOT / "public" / "vectors"
+PROVENANCE = ROOT / "provenance"
+GLOBE = ROOT / "mapserver" / "globe"
+
+
+def use_release(release: Path) -> None:
+    """Work on an installed release (www/, tiles/, vectors/, provenance/, globe/) instead."""
+    global TILES, WWW, VECTORS, PROVENANCE, GLOBE
+    release = Path(release)
+    TILES, WWW, VECTORS = release / "tiles", release / "www", release / "vectors"
+    PROVENANCE, GLOBE = release / "provenance", release / "globe"
 WORLD = [-180, -85.0511, 180, 85.0511]
 NASA = ('Imagery: <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/">'
         "NASA Earth Observatory, Blue Marble: Next Generation</a>")
@@ -47,6 +64,47 @@ ORIGIN = "__MAPSERVER_ORIGIN__"
 
 def provenance(path: Path) -> dict | None:
     return json.loads(path.read_text()) if path.exists() else None
+
+
+def regions_index() -> dict:
+    """tiles/landsat/index.json: every region whose tiles are here, from each one's PROVENANCE.json.
+    What the globe's Layers control reads. Written by build_region.py, and by import_regions.py
+    on an installed release."""
+    base = TILES / "landsat"
+    regions = []
+    for prov in sorted(base.glob("*/PROVENANCE.json")) if base.exists() else []:
+        rec = json.loads(prov.read_text())
+        cfg, name = rec["region"], prov.parent.name
+        regions.append({
+            "name": name,
+            "title": cfg.get("title", name),
+            "bbox": cfg["bbox"],
+            **({"boundary": cfg["boundary"]} if cfg.get("boundary") else {}),
+            "zoom": cfg["zoom"],
+            "url": f"/tiles/landsat/{name}/{{z}}/{{x}}/{{y}}.webp",
+            **({"tiles_index": f"/tiles/landsat/{name}/tiles.json"} if (prov.parent / "tiles.json").exists() else {}),
+            "credit": rec["data"]["credit"],
+            "built_utc": rec["built_utc"],
+            "tile_count": rec["output"]["tile_count"],
+            **({"terrain": {
+                "url": f"/tiles/landsat/{name}/terrain/{{z}}/{{x}}/{{y}}.webp",
+                "tiles_index": f"/tiles/landsat/{name}/terrain/tiles.json",
+                "zoom": rec["terrain"]["zoom"],
+                "source": rec["terrain"]["label"],
+                "detail_m": rec["terrain"]["detail_m"],
+                "credit": rec["terrain"]["credit"],
+            }} if rec.get("terrain") and (prov.parent / "terrain" / "tiles.json").exists() else {}),
+        })
+    return {"regions": regions}
+
+
+def write_atomic(path: Path, text: str) -> None:
+    """Swap the file in whole, so the server never sends half of one."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
 
 
 def tiled_layers(base: str) -> list[dict]:
@@ -124,7 +182,7 @@ def tiled_layers(base: str) -> list[dict]:
 
 
 def vector_layers(base: str) -> list[dict]:
-    rec = provenance(ROOT / "provenance" / "vectors.json")
+    rec = provenance(PROVENANCE / "vectors.json")
     titles = {"country-borders": "Country borders", "us-states": "US states", "coastlines": "Coastlines"}
     out = []
     for name, v in (rec or {}).get("layers", {}).items():
@@ -256,7 +314,7 @@ def centre_tile(bounds: list[float], z: int) -> tuple[int, int]:
 def vector_thumbnail(layer_id: str, size: int = 128) -> str:
     """The layer's lines as a small inline SVG: Web Mercator, fitted to the data, points snapped
     to a half-pixel grid so even the 1.3 MB coastline file comes out at a few tens of KB."""
-    path = ROOT / "public" / "vectors" / f"{layer_id}.geojson"
+    path = VECTORS / f"{layer_id}.geojson"
     if not path.exists():
         return ""
 
@@ -295,7 +353,7 @@ def vector_thumbnail(layer_id: str, size: int = 128) -> str:
 
 def globe_link(base: str) -> str:
     """A link to the globe this server serves at /globe/, once it's built (npm run server:globe)."""
-    if not (ROOT / "mapserver" / "globe" / "index.html").exists():
+    if not (GLOBE / "index.html").exists():
         return ""
     return (f'<p class="globe-link"><a href="{html.escape(base)}/globe/">Open the globe →</a> '
             '<span>all these layers on a 3D globe, served from here</span></p>')
@@ -396,18 +454,37 @@ def index_html(catalog: dict) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--release", type=Path, help="an installed release's folder, instead of this project")
     ap.add_argument("--base-url", help="public URL of the server, e.g. https://maps.example.com "
                                        "(default: the one used last time, else each request's own address)")
     ap.add_argument("--refresh", action="store_true",
                     help="what the build scripts run when they finish: only if the server's catalog already "
                          "exists (the server is set up), and one line of output")
     args = ap.parse_args()
+    if args.release:
+        use_release(args.release)
+    n = generate(args.base_url, refresh=args.refresh)
+    if n is None:
+        return
+    layers, base = n
+    where = "each request's own address" if base == ORIGIN else base
+    if args.refresh:
+        return print(f"map server catalog refreshed: {len(layers)} layers ({where})")
+    shown = WWW.relative_to(ROOT) if WWW.is_relative_to(ROOT) else WWW
+    print(f"{len(layers)} layers -> {shown}/ (base URL: {where})")
+    for layer in layers:
+        print(f"  {layer['kind']:<6} {layer['id']}")
+
+
+def generate(base_url: str | None = None, refresh: bool = False) -> tuple[list[dict], str] | None:
+    """Write www/: the catalog, TileJSON and index page. Returns (layers, base URL), or None when
+    refresh is set and there's no catalog yet (no map server set up here)."""
     previous = WWW / "catalog.json"
-    if args.refresh and not previous.exists():
-        return  # no map server set up here: nothing to refresh
+    if refresh and not previous.exists():
+        return None  # no map server set up here: nothing to refresh
     # Keep a published address (--base-url) across refreshes
     last = json.loads(previous.read_text()).get("base_url") if previous.exists() else None
-    base = (args.base_url or last or ORIGIN).rstrip("/")
+    base = (base_url or last or ORIGIN).rstrip("/")
 
     layers = tiled_layers(base) + vector_layers(base)
     catalog = {
@@ -424,21 +501,13 @@ def main() -> None:
         if layer["kind"] in ("raster", "terrain"):
             files[WWW / "tilejson" / f"{layer['id']}.json"] = json.dumps(tilejson(layer), indent=2) + "\n"
     for path, text in files.items():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".tmp")
-        tmp.write_text(text)
-        os.replace(tmp, path)  # each file swaps in whole, so the server never sends half of one
+        write_atomic(path, text)
     for path in sorted(WWW.rglob("*"), reverse=True):  # layers that no longer exist
         if path.is_file() and path not in files:
             path.unlink()
         elif path.is_dir() and not any(path.iterdir()):
             path.rmdir()
-    where = "each request's own address" if base == ORIGIN else base
-    if args.refresh:
-        return print(f"map server catalog refreshed: {len(layers)} layers ({where})")
-    print(f"{len(layers)} layers -> {WWW.relative_to(ROOT)}/ (base URL: {where})")
-    for layer in layers:
-        print(f"  {layer['kind']:<6} {layer['id']}")
+    return layers, base
 
 
 def refresh() -> None:

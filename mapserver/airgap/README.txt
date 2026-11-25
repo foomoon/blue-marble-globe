@@ -2,13 +2,16 @@ Blue Marble Globe map server: offline bundle
 ============================================
 
 This bundle runs the map server on a network without internet: the globe at /globe/, and the map
-layers for other web maps at /. It's serve-only: no admin page, no region builds (those need the
-internet: build regions on the connected side, make a new bundle, and install it here).
+layers for other web maps at /. Nothing is built here (builds need the internet). New regions
+built on the connected side come across as region packs, small files you import (below), or
+with the next full bundle.
 
 Contents
   install.sh      installs or updates the server from this bundle
-  images.tar      the map server's Docker image (nginx)
-  data.tar        the map data: tiles, vectors, the globe, provenance
+  add-regions.sh  imports region packs (install.sh copies it to the install folder)
+  set-password.sh sets the admin page's sign-in (copied there too)
+  images.tar      the Docker images: the map server (nginx) and its importer (Python)
+  data.tar        the map data: tiles, vectors, the globe, provenance, the sign-in and Import pages
   compose.yaml    how the server runs (install.sh copies it)
   ca.crt          the private CA's certificate, if the bundle was made with one (see HTTPS)
   SHA256SUMS      checksums of all of the above; install.sh checks them first
@@ -18,12 +21,29 @@ Install or update (on the server; needs Docker with compose, run as a user allow
   ./install.sh                          into /opt/blue-marble-globe
   ./install.sh /srv/blue-marble-globe   or another folder
 
-  Each install unpacks a new release next to the previous one and switches to it. To go back:
+  Each install unpacks a new release next to the previous one and switches to it. Regions you
+  imported here (below) that the new bundle doesn't have are kept. To go back:
   point the "current" link at the older folder in releases/, and change the image version in
   compose.yaml to match its name, then: docker compose -f <folder>/compose.yaml up -d --force-recreate
 
 Ports: 80 (HTTP) and 443 (HTTPS). To change them, edit .env in the install folder, then run
-install.sh again (or docker compose ... up -d).
+install.sh again (or docker compose ... up -d). Run install.sh as the user who should own the
+install folder (one allowed to use Docker), not root: the importer runs as that user.
+
+Adding regions: region packs
+  On the connected side, export built regions: the admin page's Regions panel, "Export for
+  another server" (tick them, download one .tar), or npm run regions:export -- kauai,maui.
+  Carry the file across, then either:
+
+  - the admin page: https://<this server's name>/admin/ (the Admin pill on the globe). Sign in,
+    drop the file on the page. Set the sign-in once first, on the server: ./set-password.sh
+    (in the install folder). It's this server's own login, not the connected side's.
+  - or on the server: ./add-regions.sh regions-kauai-....tar   (in the install folder)
+
+  Every file is checked (SHA-256) before anything changes; a damaged or altered pack is refused.
+  The regions go in beside the others, or replace their own older builds. Nothing else changes,
+  the server keeps running, and the globe shows them on the next page load.
+  No admin page at all (serve-only): put ADMIN=off in .env, then run install.sh again.
 
 HTTPS
   Put the server's certificate and key in <install folder>/tls/ as server.crt and server.key,
