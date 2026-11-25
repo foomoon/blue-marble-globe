@@ -1,10 +1,59 @@
 # Blue Marble Globe
 
-A clean CesiumJS globe on self-hosted NASA Blue Marble tiles. It needs no API keys, no online map services and no licence, and every tile can be traced back to the exact NASA files it came from.
+**A whole-Earth 3D globe and a containerized map server, built entirely from free-to-use public data, in about 1.4 GB.**
 
 ![The globe on Blue Marble, with country borders and US states](docs/images/globe-blue-marble.jpg)
 
-**Using it** (once set up, below), all from the map server on your machine:
+Blue Marble Globe builds its own map layers from public sources and serves them from a small Docker map server: to its own CesiumJS globe, and to any other web map (Leaflet, MapLibre, OpenLayers, Cesium, QGIS). No API keys, no online map services, no licence fees, and every tile can be traced back to the exact source files it came from.
+
+### What it builds
+
+| Layer | Source | Detail | Size |
+| --- | --- | --- | --- |
+| **Satellite base map** | NASA Blue Marble: Next Generation | 500 m | 156 MB |
+| **Grey base map** | Natural Earth land and lakes | 1:10m | ~100 MB |
+| **Terrain** | NOAA ETOPO 2022 | ~450 m | 830 MB |
+| **Country borders, US states, coastlines** | Natural Earth | 1:50m, vector | 2 MB |
+| **High-resolution regions**, wherever you draw them | USGS Landsat 8/9 imagery; USGS 3DEP and NASA NASADEM terrain | 30 m imagery; 10 m (US) or 30 m terrain | a few MB each |
+
+### Small by design
+
+The globe is **medium resolution everywhere and sharp only where you need it**. The whole planet comes at 500 m imagery and 450 m terrain; for the places that matter to you, draw a region on the globe and the server builds 30 m imagery and 10 to 30 m terrain for just that area, in a minute or so. Sharp imagery of the entire Earth would run to terabytes; this way the whole service stays light:
+
+| | |
+| --- | --- |
+| Map data: base maps, terrain, vectors and regions | ~1.1 GB |
+| The globe app | 13 MB |
+| The map server container (nginx) | 26 MB |
+| **Everything, as one offline bundle** | **~1.4 GB** |
+
+The builder container that makes the layers (GDAL, Python, Node: 816 MB) stays on the machine that builds them; the map server doesn't need it.
+
+### Build connected, serve air-gapped
+
+Everything is built on a machine with internet access: the map data, and any regions you add from the admin page. If the map server has to run on a network without internet, one command packs the server and all its data into a single folder to carry across, and one script installs or updates it there, with nothing but Docker.
+
+```mermaid
+flowchart LR
+  subgraph Connected["Internet-connected machine"]
+    A["npm run maps<br/>base maps, terrain, vectors"] --> S["Map server + builder<br/>globe, admin page, regions"]
+    S --> B["npm run bundle<br/>one folder, ~1.4 GB"]
+  end
+  subgraph Gapped["Air-gapped network"]
+    I["./install.sh<br/>checks every file's checksum"] --> M["Map server, serve-only<br/>globe and layers over HTTPS"]
+  end
+  B -- "carried across" --> I
+```
+
+Updates travel the same way. The air-gapped server serves the globe and every layer fully offline, over HTTPS with your network's own certificate or one the project makes for you.
+
+### Free to use
+
+Nothing needs a licence, an account or a fee. USGS's Landsat imagery and 3DEP elevation, NOAA's ETOPO and Natural Earth's maps are public domain; NASA's Blue Marble and NASADEM are free to use under NASA's guidelines (credit NASA, imply no endorsement). The credits the agencies ask for are shown automatically, on the globe and in every layer the map server hands out. [LICENSING.md](LICENSING.md) quotes the terms, backed by archived copies of the agencies' own pages in [provenance/terms/](provenance/terms/), and [provenance/](provenance/) records the checksum of every source file and every command used to build from it.
+
+## Using it
+
+Once set up (see Quick start), everything is on the map server:
 
 | | |
 | --- | --- |
@@ -14,8 +63,7 @@ A clean CesiumJS globe on self-hosted NASA Blue Marble tiles. It needs no API ke
 
 - **How to build the map data:** [docs/building-the-tiles.md](docs/building-the-tiles.md)
 - **How to add imagery and vector layers in code:** [docs/adding-a-map-layer.md](docs/adding-a-map-layer.md)
-- **Why no licence is needed:** [LICENSING.md](LICENSING.md), backed by archived copies of [NASA's usage guidelines](provenance/terms/nasa-images-and-media-guidelines.md)
-- **Where every tile came from:** [provenance/](provenance/)
+- **How to run it on another network, with HTTPS:** [docs/map-server.md](docs/map-server.md)
 
 ## Quick start
 
